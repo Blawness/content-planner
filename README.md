@@ -9,13 +9,21 @@ Aplikasi web Next.js untuk merencanakan, mengelola, dan menganalisis konten deng
    npm install
    ```
 
-2. Salin env contoh dan atur URL backend:
+2. Salin env contoh dan atur variabel:
    ```bash
    cp .env.example .env.local
    ```
-   Edit `.env.local` dan set `NEXT_PUBLIC_API_URL` ke base URL API backend (misal `http://localhost:3001`).
+   Edit `.env.local`:
+   - **DATABASE_URL**: connection string PostgreSQL (Neon atau lokal).
+   - **JWT_SECRET**: secret untuk JWT (min 32 karakter).
+   - **NEXT_PUBLIC_API_URL**: kosongkan untuk pakai backend dalam repo (`/api`); isi jika backend dipisah.
 
-3. Jalankan development server:
+3. Jalankan migrasi database (setelah `DATABASE_URL` dan `JWT_SECRET` diisi):
+   ```bash
+   npm run db:migrate
+   ```
+
+4. Jalankan development server:
    ```bash
    npm run dev
    ```
@@ -39,16 +47,20 @@ Aplikasi web Next.js untuk merencanakan, mengelola, dan menganalisis konten deng
 - TanStack Query untuk data fetching
 - Auth via context + sessionStorage + cookie (untuk middleware)
 
-## Backend
+## Backend (Next.js Route Handlers + Prisma + PostgreSQL)
 
-Frontend memanggil REST API sesuai PRD. Pastikan backend menyediakan:
+Backend berjalan di repo yang sama sebagai Route Handlers (`app/api/`), dengan Prisma dan PostgreSQL (Neon).
 
-- `POST /auth/register`, `POST /auth/login`
-- `GET/POST /projects`, `GET /projects/:id`
-- `GET/POST/PATCH /tasks`
-- `POST /ai/generate-content`, `POST /ai/generate-schedule`, `POST /ai/chat`, `POST /ai/predict-task`
-- `GET /workspaces`, `POST /workspaces`
-- `GET/POST/PATCH /time-entries` (opsional)
-- `GET /analytics` (opsional)
+Setelah mengatur `DATABASE_URL` dan `JWT_SECRET`, jalankan migrasi:
+```bash
+npm run prisma:generate
+npm run db:migrate
+```
 
-Jika backend belum siap, halaman akan menampilkan error/empty state yang sesuai.
+Endpoint yang disediakan:
+- `POST /api/auth/register`, `POST /api/auth/login`
+- `GET/POST /api/workspaces`
+- `GET/POST /api/projects`, `GET /api/projects/:id`
+- `GET/POST/PATCH /api/tasks`
+- `GET /api/health` (cek koneksi DB)
+- (Rencana: AI, time-entries, analytics)

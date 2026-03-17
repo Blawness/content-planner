@@ -10,7 +10,7 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, enterAsGuest } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const from = searchParams.get('from')
@@ -84,6 +84,19 @@ function LoginForm() {
             Daftar
           </Link>
         </p>
+        <div className="pt-2 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={() => {
+              enterAsGuest()
+              router.push('/dashboard')
+              router.refresh()
+            }}
+            className="w-full py-2 px-4 rounded-lg border border-dashed border-gray-400 text-gray-600 hover:bg-gray-50"
+          >
+            Masuk sebagai tamu
+          </button>
+        </div>
       </div>
     </main>
   )

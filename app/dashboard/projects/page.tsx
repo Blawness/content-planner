@@ -8,19 +8,32 @@ import type { Project } from '@/types'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 
+const DEMO_PROJECTS: Project[] = [
+  { id: 'demo-1', workspace_id: 'ws-1', name: 'Ramadan Campaign', description: 'Konten campaign Ramadan 30 hari', start_date: null, end_date: null },
+  { id: 'demo-2', workspace_id: 'ws-1', name: 'Product Launch Q2', description: 'Launch produk baru Instagram + TikTok', start_date: null, end_date: null },
+]
+
 export default function ProjectsListPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const { token } = useAuth()
+  const { token, isGuest } = useAuth()
 
   useEffect(() => {
-    if (!token) return
+    if (isGuest) {
+      setProjects(DEMO_PROJECTS)
+      setLoading(false)
+      return
+    }
+    if (!token) {
+      setLoading(false)
+      return
+    }
     getProjects(token)
       .then(setProjects)
       .catch((err) => setError(err instanceof Error ? err.message : 'Gagal memuat proyek'))
       .finally(() => setLoading(false))
-  }, [token])
+  }, [token, isGuest])
 
   if (loading) {
     return (
@@ -42,6 +55,11 @@ export default function ProjectsListPage() {
       {error && (
         <p className="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-lg" role="alert">
           {error}
+        </p>
+      )}
+      {isGuest && (
+        <p className="mb-4 text-sm text-amber-700 bg-amber-50 p-2 rounded-lg">
+          Mode tamu: menampilkan data contoh. Login untuk data asli.
         </p>
       )}
       {projects.length === 0 ? (

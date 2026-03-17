@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { HomeActions } from '@/components/features/HomeActions'
 
 export default function HomePage() {
   return (
@@ -7,7 +8,7 @@ export default function HomePage() {
       <p className="text-gray-600 text-center max-w-md">
         Plan, manage, and analyze content with AI. Generate ideas, schedules, and track productivity.
       </p>
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-4 justify-center">
         <Link
           href="/login"
           className="px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800"
@@ -20,6 +21,7 @@ export default function HomePage() {
         >
           Register
         </Link>
+        <HomeActions />
       </div>
     </main>
   )

@@ -9,10 +9,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
   const token = request.cookies.get('content_planner_token')?.value
-  const hasSessionCookie = !!token
+  const guest = request.cookies.get('content_planner_guest')?.value
+  const hasAccess = !!token || guest === '1'
   const isDashboard = pathname.startsWith('/dashboard')
   const isOnboarding = pathname.startsWith('/onboarding')
-  if ((isDashboard || isOnboarding) && !hasSessionCookie) {
+  if ((isDashboard || isOnboarding) && !hasAccess) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('from', pathname)
     return NextResponse.redirect(loginUrl)

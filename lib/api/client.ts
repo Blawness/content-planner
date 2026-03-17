@@ -6,7 +6,9 @@ export async function apiClient<T>(
 ): Promise<T> {
   const { token, ...init } = options
   const base = getBaseUrl().replace(/\/$/, '')
-  const url = path.startsWith('http') ? path : `${base}${path.startsWith('/') ? path : `/${path}`}`
+  const pathStr = path.startsWith('/') ? path : `/${path}`
+  const url =
+    path.startsWith('http') ? path : base ? `${base}${pathStr}` : `/api${pathStr}`
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(init.headers as Record<string, string>),

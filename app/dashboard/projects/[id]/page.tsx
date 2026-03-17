@@ -14,6 +14,17 @@ import { TaskPredictionBadge } from '@/components/features/TaskPredictionBadge'
 
 const STATUSES: TaskStatus[] = ['Backlog', 'In Progress', 'Review', 'Done']
 
+const DEMO_PROJECTS: Record<string, Project> = {
+  'demo-1': { id: 'demo-1', workspace_id: 'ws-1', name: 'Ramadan Campaign', description: 'Konten campaign Ramadan 30 hari', start_date: null, end_date: null },
+  'demo-2': { id: 'demo-2', workspace_id: 'ws-1', name: 'Product Launch Q2', description: 'Launch produk baru Instagram + TikTok', start_date: null, end_date: null },
+}
+
+const DEMO_TASKS: Task[] = [
+  { id: 't1', project_id: 'demo-1', title: 'Buat moodboard konten', description: null, status: 'Done', assignee: null, deadline: null },
+  { id: 't2', project_id: 'demo-1', title: 'Script video Reels', description: null, status: 'In Progress', assignee: null, deadline: null },
+  { id: 't3', project_id: 'demo-1', title: 'Review caption', description: null, status: 'Backlog', assignee: null, deadline: null },
+]
+
 export default function ProjectDetailPage() {
   const params = useParams()
   const id = params.id as string
@@ -23,11 +34,20 @@ export default function ProjectDetailPage() {
   const [error, setError] = useState('')
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [adding, setAdding] = useState(false)
-  const { token } = useAuth()
+  const { token, isGuest } = useAuth()
   const router = useRouter()
 
   function load() {
-    if (!token || !id) return
+    if (isGuest && (id === 'demo-1' || id === 'demo-2')) {
+      setProject(DEMO_PROJECTS[id] ?? null)
+      setTasks(id === 'demo-1' ? DEMO_TASKS : [])
+      setLoading(false)
+      return
+    }
+    if (!token || !id) {
+      setLoading(false)
+      return
+    }
     getProject(id, token)
       .then(setProject)
       .catch((e) => setError(e instanceof Error ? e.message : 'Gagal memuat proyek'))
@@ -40,10 +60,11 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, id])
+  }, [token, id, isGuest])
 
   async function handleAddTask(e: React.FormEvent) {
     e.preventDefault()
+    if (isGuest) return
     if (!token || !newTaskTitle.trim()) return
     setAdding(true)
     try {
@@ -56,6 +77,7 @@ export default function ProjectDetailPage() {
   }
 
   async function handleStatusChange(taskId: string, status: TaskStatus) {
+    if (isGuest) return
     if (!token) return
     try {
       await updateTask(taskId, { status }, token)
@@ -91,9 +113,15 @@ export default function ProjectDetailPage() {
           ← Projects
         </Link>
       </div>
+      {isGuest && (
+        <p className="mb-4 text-sm text-amber-700 bg-amber-50 p-2 rounded-lg">
+          Mode tamu: data contoh. Login untuk mengedit task.
+        </p>
+      )}
       <h1 className="text-2xl font-bold mb-1">{project.name}</h1>
       {project.description && <p className="text-gray-600 mb-6">{project.description}</p>}
 
+      {!isGuest && (
       <form onSubmit={handleAddTask} className="mb-6 flex gap-2">
         <input
           type="text"
@@ -106,6 +134,7 @@ export default function ProjectDetailPage() {
           {adding ? 'Menambah...' : 'Tambah Task'}
         </Button>
       </form>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {tasksByStatus.map(({ status, tasks: list }) => (
@@ -130,6 +159,7 @@ export default function ProjectDetailPage() {
                       </p>
                     )}
                     <TaskPredictionBadge taskId={task.id} taskTitle={task.title} token={token} />
+                    {!isGuest && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {STATUSES.filter((s) => s !== task.status).map((s) => (
                         <button
@@ -142,6 +172,7 @@ export default function ProjectDetailPage() {
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
                 ))
               )}
