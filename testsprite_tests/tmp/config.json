@@ -1,0 +1,18 @@
+{
+  "status": "init",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000/",
+  "loginUser": "demo@example.com",
+  "loginPassword": "password123",
+  "executionArgs": {
+    "projectName": "content-planner",
+    "projectPath": "c:\\Users\\Laptop MSI\\Documents\\pkp\\content-planner",
+    "testIds": [],
+    "additionalInstruction": "Generate and execute tests for the core features identified in the PRD and code summary.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-H99dTUGDF5wgIllZ5iM4mFQvcOYbjsFdqHXZTulp5BY9a5Gstxxc5w6DctHlKtlWUQntgABqqHE1tBX-JO6K7HMcDfdp5DXgjstBFTtOfsQYZVBay-HqRz8s8sgYuS-em_E"
+    }
+  }
+}

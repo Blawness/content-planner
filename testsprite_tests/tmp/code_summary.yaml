@@ -1,0 +1,45 @@
+tech_stack:
+  frontend:
+    framework: Next.js
+    language: TypeScript
+    styling: Tailwind CSS
+  backend:
+    framework: Next.js (Server Actions & API Routes)
+    language: TypeScript
+    orm: Prisma
+    database: PostgreSQL
+  ai:
+    gateway: OpenRouter API
+  deployment:
+    platform: Vercel
+
+features:
+  authentication:
+    - user registration
+    - user login
+    - jwt auth
+    - workspace based access control
+  ai_content_idea_generator:
+    - input: niche, platform, goal, target audience
+    - output: title, hook, format, caption draft, cta
+    - uses openrouter api
+  ai_content_schedule_generator:
+    - input: frequency, platform, campaign theme, duration
+    - output: content calendar visualization
+  project_management:
+    - project creation
+    - task list management
+    - status tracking (backlog, in progress, review, done)
+    - team members (assignments)
+  time_tracker:
+    - start/stop timer for tasks
+    - historical data for productivity
+  ai_task_prediction:
+    - predicts task duration based on history
+  ai_chat_assistant:
+    - conversational ai for content strategy
+  productivity_analytics:
+    - dashboard metrics
+    - average duration, consistency tracking
+  onboarding:
+    - initial setup flow for new users and workspaces
