@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
+import { getUserWorkspaceIds } from '@/lib/rbac';
 
 export async function GET(request: Request) {
   try {
@@ -12,12 +13,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'taskId is required' }, { status: 400 });
     }
 
+    // Only return time entries the user owns (privacy: each member sees their own)
+    const workspaceIds = await getUserWorkspaceIds(userId);
     const timeEntries = await prisma.timeEntry.findMany({
       where: {
         taskId,
-        userId
+        userId,
+        task: { project: { workspaceId: { in: workspaceIds } } },
       },
-      orderBy: { startTime: 'desc' }
+      orderBy: { startTime: 'desc' },
     });
 
     return NextResponse.json({ timeEntries });
@@ -41,18 +45,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'taskId and startTime are required' }, { status: 400 });
     }
 
-    // Check task access
+    // Verify user is a member of the task's workspace
+    const workspaceIds = await getUserWorkspaceIds(userId);
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      include: { project: { include: { workspace: true } } }
+      include: { project: { select: { workspaceId: true } } },
     });
-
-    if (!task || task.project.workspace.ownerId !== userId) {
-      // For beta we assume only owner can track time (or we can skip strict check if member)
-      // Since privacy model says Team members can edit task. Let's just check if task exists.
-      if (!task) {
-        return NextResponse.json({ message: 'Task not found' }, { status: 404 });
-      }
+    if (!task || !workspaceIds.includes(task.project.workspaceId)) {
+      return NextResponse.json({ message: 'Task not found' }, { status: 404 });
     }
 
     const start = new Date(startTime);

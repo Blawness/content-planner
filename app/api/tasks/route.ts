@@ -2,14 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
 import { formatDate, toApiTaskStatus, fromApiTaskStatus } from '@/lib/api/serialize'
-
-async function canAccessProject(userId: string, projectId: string): Promise<boolean> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: { workspace: true },
-  })
-  return project?.workspace.ownerId === userId
-}
+import { getUserWorkspaceIds, requireWorkspaceRole } from '@/lib/rbac'
 
 function taskToJson(t: {
   id: string
@@ -38,11 +31,9 @@ export async function GET(request: Request) {
     const { sub: userId } = await requireAuth(request)
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId') || undefined
-    const workspaces = await prisma.workspace.findMany({
-      where: { ownerId: userId },
-      select: { id: true },
-    })
-    const workspaceIds = workspaces.map((w) => w.id)
+
+    const workspaceIds = await getUserWorkspaceIds(userId)
+
     const list = await prisma.task.findMany({
       where: {
         project: {
@@ -52,6 +43,7 @@ export async function GET(request: Request) {
       },
       orderBy: { createdAt: 'desc' },
     })
+
     return NextResponse.json(list.map(taskToJson))
   } catch (e) {
     if (e instanceof Response) return e
@@ -68,19 +60,29 @@ export async function POST(request: Request) {
     const body = await request.json()
     const projectId = typeof body.project_id === 'string' ? body.project_id : ''
     const title = typeof body.title === 'string' ? body.title.trim() : ''
+
     if (!projectId || !title) {
       return NextResponse.json(
         { message: 'project_id and title are required' },
         { status: 400 }
       )
     }
-    const allowed = await canAccessProject(userId, projectId)
-    if (!allowed) {
+
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { workspaceId: true },
+    })
+    if (!project) {
       return NextResponse.json({ message: 'Project not found' }, { status: 404 })
     }
+
+    // Must be admin or owner to create tasks
+    await requireWorkspaceRole(userId, project.workspaceId, 'admin')
+
     const status = body.status != null ? (fromApiTaskStatus(body.status) ?? 'BACKLOG') : 'BACKLOG'
     const deadline = body.deadline ? new Date(body.deadline) : null
     const assigneeId = typeof body.assignee === 'string' ? body.assignee || null : null
+
     const task = await prisma.task.create({
       data: {
         projectId,
@@ -91,7 +93,8 @@ export async function POST(request: Request) {
         deadline: deadline && !isNaN(deadline.getTime()) ? deadline : null,
       },
     })
-    return NextResponse.json(taskToJson(task))
+
+    return NextResponse.json(taskToJson(task), { status: 201 })
   } catch (e) {
     if (e instanceof Response) return e
     return NextResponse.json(

@@ -1,24 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
+import { getUserWorkspaceIds } from '@/lib/rbac';
 
 export async function GET(request: Request) {
   try {
     const { sub: userId } = await requireAuth(request);
     
-    // For MVP Beta, let's just aggregate data across workspaces owned by user or where user is member
-    
-    // 1. Get workspaces where user is owner or member
-    const userWorkspaces = await prisma.workspace.findMany({
-      where: {
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId } } }
-        ]
-      },
-      select: { id: true }
-    });
-    const workspaceIds = userWorkspaces.map(w => w.id);
+    const workspaceIds = await getUserWorkspaceIds(userId);
 
     // 2. Get metrics from completed tasks
     const completedTasksCount = await prisma.task.count({

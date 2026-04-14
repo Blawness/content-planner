@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import { openRouterChat } from '@/lib/openrouter';
+import { getActiveAiModel } from '@/lib/ai-settings';
 
 export async function POST(request: Request) {
   try {
@@ -17,33 +18,30 @@ export async function POST(request: Request) {
       );
     }
 
+    const model = await getActiveAiModel();
+
     const systemPrompt = {
       role: 'system',
-      content: 'You are an AI assistant specialized in social media strategy and content creation. Help the user plan, analyze, and create better content.',
+      content:
+        'You are an AI assistant specialized in social media strategy and content creation. Help the user plan, analyze, and create better content.',
     };
 
-    const messages = [
-      systemPrompt,
-      ...history,
-      { role: 'user', content: message }
-    ];
+    const messages = [systemPrompt, ...history, { role: 'user', content: message }];
 
-    // Disable json requirement for chat
-    const aiContent = await openRouterChat(messages, 'google/gemini-2.5-flash', false);
+    const aiContent = await openRouterChat(messages, model, false);
 
-    // Save history
     await prisma.aiRequest.create({
       data: {
         userId,
-        prompt: message, // saving the latest message as the prompt
+        prompt: message,
         response: aiContent,
       },
     });
 
-    return NextResponse.json({ response: aiContent });
+    return NextResponse.json({ response: aiContent, model });
   } catch (e) {
-    console.error("Error in ai chat:", e);
-    if (e instanceof Response) return e; // Auth error
+    console.error('Error in ai chat:', e);
+    if (e instanceof Response) return e;
     return NextResponse.json(
       { message: e instanceof Error ? e.message : 'Internal Server Error' },
       { status: 500 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import { generateContentPrompt } from '@/lib/prompts';
 import { openRouterChat } from '@/lib/openrouter';
+import { getActiveAiModel } from '@/lib/ai-settings';
 
 export async function POST(request: Request) {
   try {
@@ -21,9 +22,10 @@ export async function POST(request: Request) {
     const maxCount = Math.min(Math.max(count, 1), 10);
     const prompt = generateContentPrompt(niche, platform, goal, targetAudience, maxCount);
 
+    const model = await getActiveAiModel();
     const aiContent = await openRouterChat([
       { role: 'user', content: prompt }
-    ]);
+    ], model);
 
     // Save history
     await prisma.aiRequest.create({

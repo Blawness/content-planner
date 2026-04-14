@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 export type User = {
   id: string
   email: string
+  isSuperuser?: boolean
 }
 
 type AuthContextType = {
@@ -23,7 +24,7 @@ const AuthContext = createContext<AuthContextType | null>(null)
 const TOKEN_KEY = 'content_planner_token'
 const USER_KEY = 'content_planner_user'
 const GUEST_COOKIE = 'content_planner_guest'
-const GUEST_USER: User = { id: 'guest', email: 'Tamu' }
+const GUEST_USER: User = { id: 'guest', email: 'Tamu', isSuperuser: false }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)

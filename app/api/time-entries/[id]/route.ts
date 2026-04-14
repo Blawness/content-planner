@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+type Params = { params: Promise<{ id: string }> }
+
+export async function PATCH(request: Request, { params }: Params) {
   try {
     const { sub: userId } = await requireAuth(request);
-    const id = params.id;
+    const { id } = await params;
     const body = await request.json();
     const { endTime } = body;
 
@@ -20,7 +22,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     if (currentEntry.userId !== userId) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 403 });
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
     const end = new Date(endTime);
@@ -31,14 +33,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       data: {
         endTime: end,
         duration: durationMins,
-      }
+      },
     });
 
     return NextResponse.json({ timeEntry: updatedEntry });
-
   } catch (e) {
-    console.error("Error patching time-entry:", e);
-    if (e instanceof Response) return e; // Auth error
+    console.error('Error patching time-entry:', e);
+    if (e instanceof Response) return e;
     return NextResponse.json(
       { message: e instanceof Error ? e.message : 'Internal Server Error' },
       { status: 500 }

@@ -32,10 +32,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const token = signToken({ sub: user.id, email: user.email })
+    const token = signToken({ sub: user.id, email: user.email, isSuperuser: user.isSuperuser })
     return NextResponse.json({
       token,
-      user: { id: user.id, email: user.email },
+      user: { id: user.id, email: user.email, isSuperuser: user.isSuperuser },
     })
   } catch (e) {
     return NextResponse.json(

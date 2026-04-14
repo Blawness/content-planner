@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import { generateSchedulePrompt } from '@/lib/prompts';
 import { openRouterChat } from '@/lib/openrouter';
+import { getActiveAiModel } from '@/lib/ai-settings';
 
 export async function POST(request: Request) {
   try {
@@ -22,9 +23,10 @@ export async function POST(request: Request) {
     const maxPosts = Math.min(Math.max(contentPerWeek, 1), 14);
     const prompt = generateSchedulePrompt(maxPosts, platform, theme, maxWeeks);
 
+    const model = await getActiveAiModel();
     const aiContent = await openRouterChat([
       { role: 'user', content: prompt }
-    ]);
+    ], model);
 
     // Save history
     await prisma.aiRequest.create({

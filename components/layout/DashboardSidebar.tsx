@@ -16,6 +16,10 @@ const nav = [
   { href: '/dashboard/analytics', label: 'Analytics' },
 ]
 
+const adminNav = [
+  { href: '/dashboard/admin', label: '⚙ Admin Panel' },
+]
+
 export function DashboardSidebar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -64,12 +68,38 @@ export function DashboardSidebar() {
             </Link>
           )
         })}
+
+        {/* Superuser-only admin section */}
+        {user?.isSuperuser && (
+          <div className="pt-2 mt-2 border-t border-gray-200">
+            <p className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</p>
+            {adminNav.map(({ href, label }) => {
+              const active = pathname === href || pathname.startsWith(href)
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`block px-3 py-2 rounded-lg text-sm font-medium ${
+                    active ? 'bg-red-600 text-white' : 'text-red-600 hover:bg-red-50'
+                  }`}
+                >
+                  {label}
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </nav>
       <div className="p-2 border-t border-gray-200">
         {user && (
-          <p className="px-3 py-1 text-xs text-gray-500 truncate" title={user.email}>
-            {user.email}
-          </p>
+          <div className="px-3 py-1">
+            <p className="text-xs text-gray-500 truncate" title={user.email}>{user.email}</p>
+            {user.isSuperuser && (
+              <span className="inline-block mt-0.5 text-xs font-medium text-red-600 bg-red-50 rounded px-1.5 py-0.5">
+                Superuser
+              </span>
+            )}
+          </div>
         )}
         <button
           type="button"

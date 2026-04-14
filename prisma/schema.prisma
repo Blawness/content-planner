@@ -7,10 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Global app settings — managed by superuser
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
   passwordHash String    @map("password_hash")
+  // superuser = platform-level admin, manages all settings & users
+  isSuperuser  Boolean   @default(false) @map("is_superuser")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
@@ -31,12 +43,19 @@ model Workspace {
   projects Project[]
 }
 
+// Workspace-level roles: owner > admin > member
+enum WorkspaceRole {
+  owner
+  admin
+  member
+}
+
 model WorkspaceMember {
-  id          String    @id @default(cuid())
-  workspaceId String   @map("workspace_id")
-  userId      String   @map("user_id")
-  role        String   @default("member") // owner | admin | member
-  createdAt   DateTime @default(now()) @map("created_at")
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  userId      String        @map("user_id")
+  role        WorkspaceRole @default(member)
+  createdAt   DateTime      @default(now()) @map("created_at")
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)

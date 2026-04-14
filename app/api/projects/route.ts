@@ -2,35 +2,47 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
 import { formatDate } from '@/lib/api/serialize'
+import { getUserWorkspaceIds, requireWorkspaceRole } from '@/lib/rbac'
+
+function projectToJson(p: {
+  id: string
+  workspaceId: string
+  name: string
+  description: string | null
+  startDate: Date | null
+  endDate: Date | null
+  createdAt: Date
+}) {
+  return {
+    id: p.id,
+    workspace_id: p.workspaceId,
+    name: p.name,
+    description: p.description,
+    start_date: formatDate(p.startDate),
+    end_date: formatDate(p.endDate),
+    created_at: formatDate(p.createdAt),
+  }
+}
 
 export async function GET(request: Request) {
   try {
     const { sub: userId } = await requireAuth(request)
     const { searchParams } = new URL(request.url)
     const workspaceId = searchParams.get('workspaceId') || undefined
-    const workspaces = await prisma.workspace.findMany({
-      where: { ownerId: userId },
-      select: { id: true },
-    })
-    const workspaceIds = workspaces.map((w) => w.id)
+
+    const workspaceIds = await getUserWorkspaceIds(userId)
+
     const list = await prisma.project.findMany({
       where: {
-        workspaceId: workspaceId && workspaceIds.includes(workspaceId)
-          ? workspaceId
-          : { in: workspaceIds },
+        workspaceId:
+          workspaceId && workspaceIds.includes(workspaceId)
+            ? workspaceId
+            : { in: workspaceIds },
       },
       orderBy: { createdAt: 'desc' },
     })
-    const data = list.map((p) => ({
-      id: p.id,
-      workspace_id: p.workspaceId,
-      name: p.name,
-      description: p.description,
-      start_date: formatDate(p.startDate),
-      end_date: formatDate(p.endDate),
-      created_at: formatDate(p.createdAt),
-    }))
-    return NextResponse.json(data)
+
+    return NextResponse.json(list.map(projectToJson))
   } catch (e) {
     if (e instanceof Response) return e
     return NextResponse.json(
@@ -46,23 +58,28 @@ export async function POST(request: Request) {
     const body = await request.json()
     const name = typeof body.name === 'string' ? body.name.trim() : ''
     const workspaceId = typeof body.workspace_id === 'string' ? body.workspace_id : ''
+
     if (!name) {
-      return NextResponse.json(
-        { message: 'name is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ message: 'name is required' }, { status: 400 })
     }
-    const owned = await prisma.workspace.findFirst({
-      where: { id: workspaceId || undefined, ownerId: userId },
-    })
-    const targetWorkspaceId = owned?.id
-      || (await prisma.workspace.findFirst({ where: { ownerId: userId }, select: { id: true } }))?.id
+
+    // Determine target workspace — must be admin/owner of it
+    let targetWorkspaceId = workspaceId
     if (!targetWorkspaceId) {
-      return NextResponse.json(
-        { message: 'No workspace found' },
-        { status: 400 }
-      )
+      const ws = await prisma.workspaceMember.findFirst({
+        where: { userId, role: { in: ['owner', 'admin'] } },
+        select: { workspaceId: true },
+      })
+      targetWorkspaceId = ws?.workspaceId ?? ''
     }
+
+    if (!targetWorkspaceId) {
+      return NextResponse.json({ message: 'No workspace found' }, { status: 400 })
+    }
+
+    // RBAC: must be admin or owner
+    await requireWorkspaceRole(userId, targetWorkspaceId, 'admin')
+
     const startDate = body.start_date ? new Date(body.start_date) : null
     const endDate = body.end_date ? new Date(body.end_date) : null
     const project = await prisma.project.create({
@@ -74,15 +91,8 @@ export async function POST(request: Request) {
         endDate: endDate && !isNaN(endDate.getTime()) ? endDate : null,
       },
     })
-    return NextResponse.json({
-      id: project.id,
-      workspace_id: project.workspaceId,
-      name: project.name,
-      description: project.description,
-      start_date: formatDate(project.startDate),
-      end_date: formatDate(project.endDate),
-      created_at: formatDate(project.createdAt),
-    })
+
+    return NextResponse.json(projectToJson(project), { status: 201 })
   } catch (e) {
     if (e instanceof Response) return e
     return NextResponse.json(
