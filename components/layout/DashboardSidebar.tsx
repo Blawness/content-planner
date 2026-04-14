@@ -4,20 +4,31 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  FolderKanban, 
+  Lightbulb, 
+  Clock, 
+  Timer, 
+  MessageSquare, 
+  BarChart2, 
+  Settings 
+} from 'lucide-react'
 
 const nav = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/dashboard/calendar', label: 'Content Calendar' },
-  { href: '/dashboard/projects', label: 'Projects' },
-  { href: '/dashboard/ideas', label: 'AI Ideas' },
-  { href: '/dashboard/schedule', label: 'AI Schedule' },
-  { href: '/dashboard/tracker', label: 'Time Tracker' },
-  { href: '/dashboard/chat', label: 'AI Chat' },
-  { href: '/dashboard/analytics', label: 'Analytics' },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/calendar', label: 'Content Calendar', icon: Calendar },
+  { href: '/dashboard/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/dashboard/ideas', label: 'AI Ideas', icon: Lightbulb },
+  { href: '/dashboard/schedule', label: 'AI Schedule', icon: Clock },
+  { href: '/dashboard/tracker', label: 'Time Tracker', icon: Timer },
+  { href: '/dashboard/chat', label: 'AI Chat', icon: MessageSquare },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
 ]
 
 const adminNav = [
-  { href: '/dashboard/admin', label: '⚙ Admin Panel' },
+  { href: '/dashboard/admin', label: 'Admin Panel', icon: Settings },
 ]
 
 export function DashboardSidebar() {
@@ -54,16 +65,21 @@ export function DashboardSidebar() {
         </Link>
       </div>
       <nav className="flex-1 p-2 space-y-0.5">
-        {nav.map(({ href, label }) => {
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
-              className={`block px-3 py-2 rounded-lg text-sm font-medium ${
+              className={`group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
               }`}
             >
+              <Icon 
+                className={`mr-3 w-5 h-5 transition-transform duration-300 ${
+                  active ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'
+                }`} 
+              />
               {label}
             </Link>
           )
@@ -73,16 +89,21 @@ export function DashboardSidebar() {
         {user?.isSuperuser && (
           <div className="pt-2 mt-2 border-t border-gray-200">
             <p className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</p>
-            {adminNav.map(({ href, label }) => {
+            {adminNav.map(({ href, label, icon: Icon }) => {
               const active = pathname === href || pathname.startsWith(href)
               return (
                 <Link
                   key={href}
                   href={href}
-                  className={`block px-3 py-2 rounded-lg text-sm font-medium ${
+                  className={`group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     active ? 'bg-red-600 text-white' : 'text-red-600 hover:bg-red-50'
                   }`}
                 >
+                  <Icon 
+                    className={`mr-3 w-5 h-5 transition-transform duration-300 ${
+                      active ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'
+                    }`} 
+                  />
                   {label}
                 </Link>
               )
