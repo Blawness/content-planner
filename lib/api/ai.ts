@@ -40,12 +40,29 @@ export async function generateSchedule(
   })
 }
 
+export async function generateScheduleStream(
+  payload: GenerateSchedulePayload,
+  token: string | null
+): Promise<Response> {
+  if (!token) {
+    throw new Error('Authentication token required');
+  }
+  return fetch('/api/ai/generate-schedule-stream', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function aiChat(
   message: string,
   token: string | null,
   history?: { role: string; content: string }[]
-): Promise<{ response: string }> {
-  return apiClient<{ response: string }>('/ai/chat', {
+): Promise<{ response: string; responseTimeMs?: number }> {
+  return apiClient<{ response: string; responseTimeMs?: number }>('/ai/chat', {
     method: 'POST',
     body: JSON.stringify({ message, history: history || [] }),
     token,

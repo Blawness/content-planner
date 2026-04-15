@@ -74,6 +74,7 @@ export type ContentPlanRow = {
 export type AIChatMessage = {
   role: 'user' | 'assistant'
   content: string
+  responseTimeMs?: number
 }
 
 export type TaskPrediction = {

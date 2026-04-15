@@ -33,5 +33,15 @@ export async function openRouterChat(
   }
 
   const data = await response.json();
-  return data.choices[0].message.content;
+
+  if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+    throw new Error(`OpenRouter API returned invalid response structure: ${JSON.stringify(data).substring(0, 200)}`);
+  }
+
+  const content = data.choices[0].message?.content;
+  if (!content) {
+    throw new Error(`OpenRouter API response missing message.content: ${JSON.stringify(data.choices[0]).substring(0, 200)}`);
+  }
+
+  return content;
 }

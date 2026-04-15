@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tail -100 .next/dev/server/*.log)"
+    ]
+  }
+}

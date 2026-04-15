@@ -4,26 +4,30 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  FolderKanban, 
-  Lightbulb, 
-  Clock, 
-  Timer, 
-  MessageSquare, 
-  BarChart2, 
-  Settings 
+import {
+  LayoutDashboard,
+  Calendar,
+  FolderKanban,
+  Lightbulb,
+  Clock,
+  Timer,
+  MessageSquare,
+  BarChart2,
+  Settings,
+  ChevronDown
 } from 'lucide-react'
 
 const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/calendar', label: 'Content Calendar', icon: Calendar },
+  { href: '/dashboard/schedule', label: 'AI Content Plan', icon: Clock },
+  { href: '/dashboard/chat', label: 'AI Chat', icon: MessageSquare },
+]
+
+const workInProgressNav = [
   { href: '/dashboard/projects', label: 'Projects', icon: FolderKanban },
   { href: '/dashboard/ideas', label: 'AI Ideas', icon: Lightbulb },
-  { href: '/dashboard/schedule', label: 'AI Content Plan', icon: Clock },
+  { href: '/dashboard/calendar', label: 'Content Calendar', icon: Calendar },
   { href: '/dashboard/tracker', label: 'Time Tracker', icon: Timer },
-  { href: '/dashboard/chat', label: 'AI Chat', icon: MessageSquare },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
 ]
 
@@ -36,6 +40,9 @@ export function DashboardSidebar() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
+  const [wipOpen, setWipOpen] = useState(false)
+
+  const isWipActive = workInProgressNav.some(item => pathname === item.href || pathname.startsWith(item.href))
 
   return (
     <>
@@ -84,6 +91,49 @@ export function DashboardSidebar() {
             </Link>
           )
         })}
+
+        {/* Work In Progress Dropdown */}
+        <div className="pt-2 mt-2 border-t border-gray-200">
+          <button
+            onClick={() => setWipOpen(!wipOpen)}
+            className={`w-full group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              isWipActive ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <ChevronDown
+              className={`mr-3 w-5 h-5 transition-transform duration-300 ${
+                wipOpen ? 'rotate-180' : ''
+              } ${
+                isWipActive ? 'scale-110' : 'group-hover:scale-110'
+              }`}
+            />
+            <span>Work In Progress</span>
+          </button>
+
+          {wipOpen && (
+            <div className="mt-1 ml-2 space-y-0.5 border-l-2 border-gray-200 pl-3">
+              {workInProgressNav.map(({ href, label, icon: Icon }) => {
+                const active = pathname === href || pathname.startsWith(href)
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      active ? 'bg-blue-100 text-blue-900' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Icon
+                      className={`mr-3 w-5 h-5 transition-transform duration-300 ${
+                        active ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'
+                      }`}
+                    />
+                    {label}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Superuser-only admin section */}
         {user?.isSuperuser && (

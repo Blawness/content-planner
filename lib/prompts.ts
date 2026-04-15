@@ -34,14 +34,16 @@ export const generateSchedulePrompt = (
   monthLabel: string | undefined
 ) => `You are an expert Content Planner.
 Create a detailed Instagram-like content plan table for ${durationWeeks} weeks, with ${contentPerWeek} posts per week.
+Total: ${durationWeeks * contentPerWeek} content plan items.
+
 Context:
 - Platform: ${platform}
 - Niche: ${niche}
 - Main idea/campaign: ${contentIdea || 'General brand awareness'}
 - Month/period label: ${monthLabel || 'Use reasonable period label from current date'}
 
-Return ONLY a valid JSON array of objects, each object representing ONE table row.
-The required keys for each row are:
+CRITICAL: Return ONLY a valid JSON ARRAY (start with [ and end with ]) containing ${durationWeeks * contentPerWeek} objects.
+Each object represents ONE table row with these keys:
 "week_label", "date", "day", "topic", "format", "headline", "visual_description", "content_body", "hook_caption", "scheduled_time", "status", "notes"
 
 Rules:
@@ -53,8 +55,9 @@ Rules:
 - "status" should be "To Do" for new plans unless there is a strong reason otherwise.
 - "notes" default to "Baru".
 - Fill every key with practical and usable value (not empty).
+- DO NOT return a single object or nested object - return a flat ARRAY with all ${durationWeeks * contentPerWeek} items.
 
-Example:
+Example (for 2 weeks, 2 posts per week = 4 items):
 [
   {
     "week_label": "Minggu 1 - 17-20 April 2026 : Topik SHM",
@@ -67,6 +70,20 @@ Example:
     "content_body": "Jelaskan definisi SHM, kapan wajib update data, dan langkah praktis mengecek keabsahan dokumen.",
     "hook_caption": "Warisan tanah tanpa balik nama itu risiko. Yuk pahami aturan SHM supaya segara urus sebelum waris.",
     "scheduled_time": "10:00 WIB",
+    "status": "To Do",
+    "notes": "Baru"
+  },
+  {
+    "week_label": "Minggu 1 - 17-20 April 2026 : Topik SHM",
+    "date": "19/04/2026",
+    "day": "Minggu",
+    "topic": "SHM",
+    "format": "Reels",
+    "headline": "Cerita Nyata: Kasus Balik Nama SHM",
+    "visual_description": "Video testimoni singkat dengan subtitle",
+    "content_body": "Cerita dari user yang mengalami masalah dengan SHM.",
+    "hook_caption": "Kisah nyata yang mengubah segalanya...",
+    "scheduled_time": "19:00 WIB",
     "status": "To Do",
     "notes": "Baru"
   }
