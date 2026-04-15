@@ -1,12 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import DatePicker from 'react-datepicker'
+import { format, isValid, parse } from 'date-fns'
+import { id as localeId } from 'date-fns/locale'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { useGenerateScheduleStream } from '@/hooks/useGenerateScheduleStream'
 import type { ContentPlanRow } from '@/types'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ChevronDown } from 'lucide-react'
+import 'react-datepicker/dist/react-datepicker.css'
 
 const PLATFORMS = ['Instagram', 'TikTok', 'LinkedIn']
 const TABLE_COLUMNS = [
@@ -38,6 +42,24 @@ function getStatusCellClass(status: string) {
   if (normalized.includes('existing')) return 'bg-blue-100 text-blue-800 border-blue-200'
   if (normalized.includes('done')) return 'bg-emerald-100 text-emerald-800 border-emerald-200'
   return 'bg-amber-100 text-amber-800 border-amber-200'
+}
+
+function toTitleCase(value: string) {
+  if (!value) return value
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function parseUiDate(value: string) {
+  const parsed = parse(value, 'dd/MM/yyyy', new Date())
+  return isValid(parsed) ? parsed : null
+}
+
+function formatUiDate(date: Date) {
+  return format(date, 'dd/MM/yyyy')
+}
+
+function getUiDay(date: Date) {
+  return toTitleCase(format(date, 'EEEE', { locale: localeId }))
 }
 
 export default function SchedulePage() {
@@ -372,13 +394,25 @@ export default function SchedulePage() {
                   <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1.5">
                     Tanggal *
                   </label>
-                  <input
+                  <DatePicker
                     id="date"
-                    type="text"
-                    value={formRow.date}
-                    onChange={(e) => handleFormRowChange('date', e.target.value)}
-                    placeholder="17/04/2026"
+                    selected={parseUiDate(formRow.date)}
+                    onChange={(date) => {
+                      if (!date) {
+                        handleFormRowChange('date', '')
+                        handleFormRowChange('day', '')
+                        return
+                      }
+
+                      handleFormRowChange('date', formatUiDate(date))
+                      handleFormRowChange('day', getUiDay(date))
+                    }}
+                    dateFormat="dd/MM/yyyy"
+                    placeholderText="dd/mm/yyyy"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    calendarClassName="text-sm"
+                    popperClassName="z-[60]"
+                    withPortal
                   />
                 </div>
                 <div>
@@ -390,8 +424,9 @@ export default function SchedulePage() {
                     type="text"
                     value={formRow.day}
                     onChange={(e) => handleFormRowChange('day', e.target.value)}
-                    placeholder="Jumat"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Otomatis dari tanggal"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    readOnly
                   />
                 </div>
                 <div>
