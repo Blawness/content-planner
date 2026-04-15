@@ -32,7 +32,7 @@ function normalizeRow(row: unknown): ContentPlanRow {
 }
 
 function parseAiResponse(aiContent: string): ContentPlanRow[] {
-  let jsonResponse;
+  let jsonResponse: any;
   try {
     jsonResponse = JSON.parse(aiContent);
 

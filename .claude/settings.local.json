@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(tail -100 .next/dev/server/*.log)"
+      "Bash(tail -100 .next/dev/server/*.log)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs"
     ]
   }
 }
