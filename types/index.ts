@@ -56,6 +56,21 @@ export type ScheduleSlot = {
   label?: string
 }
 
+export type ContentPlanRow = {
+  week_label: string
+  date: string
+  day: string
+  topic: string
+  format: string
+  headline: string
+  visual_description: string
+  content_body: string
+  hook_caption: string
+  scheduled_time: string
+  status: string
+  notes: string
+}
+
 export type AIChatMessage = {
   role: 'user' | 'assistant'
   content: string

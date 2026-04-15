@@ -21,7 +21,7 @@ const nav = [
   { href: '/dashboard/calendar', label: 'Content Calendar', icon: Calendar },
   { href: '/dashboard/projects', label: 'Projects', icon: FolderKanban },
   { href: '/dashboard/ideas', label: 'AI Ideas', icon: Lightbulb },
-  { href: '/dashboard/schedule', label: 'AI Schedule', icon: Clock },
+  { href: '/dashboard/schedule', label: 'AI Content Plan', icon: Clock },
   { href: '/dashboard/tracker', label: 'Time Tracker', icon: Timer },
   { href: '/dashboard/chat', label: 'AI Chat', icon: MessageSquare },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },

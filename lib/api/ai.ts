@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { ContentIdea, ScheduleSlot } from '@/types'
+import type { ContentIdea, ContentPlanRow } from '@/types'
 
 export type GenerateContentPayload = {
   niche: string
@@ -12,7 +12,9 @@ export type GenerateContentPayload = {
 export type GenerateSchedulePayload = {
   content_per_week: number
   platform: string
-  theme: string
+  niche: string
+  content_idea?: string
+  month_label?: string
   duration_weeks: number
 }
 
@@ -30,8 +32,8 @@ export async function generateContent(
 export async function generateSchedule(
   payload: GenerateSchedulePayload,
   token: string | null
-): Promise<{ schedule: ScheduleSlot[]; weeks?: Record<string, ScheduleSlot[]> }> {
-  return apiClient<{ schedule: ScheduleSlot[]; weeks?: Record<string, ScheduleSlot[]> }>('/ai/generate-schedule', {
+): Promise<{ schedule: ContentPlanRow[]; weeks?: Record<string, ContentPlanRow[]> }> {
+  return apiClient<{ schedule: ContentPlanRow[]; weeks?: Record<string, ContentPlanRow[]> }>('/ai/generate-schedule', {
     method: 'POST',
     body: JSON.stringify(payload),
     token,

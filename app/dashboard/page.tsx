@@ -76,6 +76,13 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500">Lihat jadwal konten</p>
         </Link>
         <Link
+          href="/dashboard/schedule"
+          className="p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+        >
+          <h2 className="font-medium">AI Content Plan</h2>
+          <p className="text-sm text-gray-500">Generate tabel rencana konten</p>
+        </Link>
+        <Link
           href="/dashboard/projects"
           className="p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
         >

@@ -28,21 +28,48 @@ Example:
 export const generateSchedulePrompt = (
   contentPerWeek: number,
   platform: string,
-  theme: string,
-  durationWeeks: number
+  niche: string,
+  contentIdea: string | undefined,
+  durationWeeks: number,
+  monthLabel: string | undefined
 ) => `You are an expert Content Planner.
-Create a content calendar for ${durationWeeks} weeks, with ${contentPerWeek} posts per week.
+Create a detailed Instagram-like content plan table for ${durationWeeks} weeks, with ${contentPerWeek} posts per week.
 Context:
 - Platform: ${platform}
-- Theme/Campaign: ${theme}
+- Niche: ${niche}
+- Main idea/campaign: ${contentIdea || 'General brand awareness'}
+- Month/period label: ${monthLabel || 'Use reasonable period label from current date'}
 
-Return ONLY a valid JSON array of objects, each representing a single post slot.
-Keys must be: "week" (number), "day" (string: Mon, Tue, Wed, etc.), "topic" (string), "format" (string)
+Return ONLY a valid JSON array of objects, each object representing ONE table row.
+The required keys for each row are:
+"week_label", "date", "day", "topic", "format", "headline", "visual_description", "content_body", "hook_caption", "scheduled_time", "status", "notes"
+
+Rules:
+- Use Bahasa Indonesia for all content text.
+- "date" format must be DD/MM/YYYY.
+- "day" must be Indonesian day name (Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu).
+- "format" should be one of: Single Post, Carousel, Reels.
+- "scheduled_time" example: 10:00 WIB or 04:00 WIB.
+- "status" should be "To Do" for new plans unless there is a strong reason otherwise.
+- "notes" default to "Baru".
+- Fill every key with practical and usable value (not empty).
 
 Example:
 [
-  { "week": 1, "day": "Mon", "topic": "Edukasi Dasar", "format": "Single Image" },
-  { "week": 1, "day": "Wed", "topic": "Storytelling di balik layar", "format": "Video" }
+  {
+    "week_label": "Minggu 1 - 17-20 April 2026 : Topik SHM",
+    "date": "17/04/2026",
+    "day": "Jumat",
+    "topic": "SHM",
+    "format": "Carousel",
+    "headline": "SHM Turun-Temurun: Aman atau Perlu Diperbarui?",
+    "visual_description": "Slide 1 cover, slide 2 definisi, slide 3 risiko, slide 4 CTA",
+    "content_body": "Jelaskan definisi SHM, kapan wajib update data, dan langkah praktis mengecek keabsahan dokumen.",
+    "hook_caption": "Warisan tanah tanpa balik nama itu risiko. Yuk pahami aturan SHM supaya segara urus sebelum waris.",
+    "scheduled_time": "10:00 WIB",
+    "status": "To Do",
+    "notes": "Baru"
+  }
 ]`;
 
 export const predictTaskPrompt = (taskTitle: string) => `You are an expert Project Manager.
