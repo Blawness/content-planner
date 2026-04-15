@@ -6,7 +6,7 @@ import { getTasks } from '@/lib/api/tasks'
 import { getTimeEntries, startTimeEntry, stopTimeEntry } from '@/lib/api/time-entries'
 import type { Task, TimeEntry } from '@/types'
 import { Card, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { Button } from '@/components/ui/button'
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)

@@ -8,7 +8,7 @@ import { getProject } from '@/lib/api/projects'
 import { getTasks, createTask, updateTask } from '@/lib/api/tasks'
 import type { Project, Task, TaskStatus } from '@/types'
 import { Card, CardContent, CardHeader } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { Button } from '@/components/ui/button'
 import { TaskStatusBadge } from '@/components/ui/TaskStatusBadge'
 import { TaskPredictionBadge } from '@/components/features/TaskPredictionBadge'
 

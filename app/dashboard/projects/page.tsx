@@ -6,7 +6,7 @@ import { useAuth } from '@/components/providers/AuthProvider'
 import { getProjects } from '@/lib/api/projects'
 import type { Project } from '@/types'
 import { Card, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { Button } from '@/components/ui/button'
 
 const DEMO_PROJECTS: Project[] = [
   { id: 'demo-1', workspace_id: 'ws-1', name: 'Ramadan Campaign', description: 'Konten campaign Ramadan 30 hari', start_date: null, end_date: null },

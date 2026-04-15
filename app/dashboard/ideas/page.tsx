@@ -5,7 +5,7 @@ import { useAuth } from '@/components/providers/AuthProvider'
 import { generateContent } from '@/lib/api/ai'
 import type { ContentIdea } from '@/types'
 import { Card, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { Button } from '@/components/ui/button'
 
 const PLATFORMS = ['Instagram', 'TikTok', 'LinkedIn']
 

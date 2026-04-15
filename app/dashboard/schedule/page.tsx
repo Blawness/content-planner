@@ -8,7 +8,7 @@ import { useAuth } from '@/components/providers/AuthProvider'
 import { useGenerateScheduleStream } from '@/hooks/useGenerateScheduleStream'
 import type { ContentPlanRow } from '@/types'
 import { Card, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { Button } from '@/components/ui/button'
 import { ChevronDown } from 'lucide-react'
 import 'react-datepicker/dist/react-datepicker.css'
 
