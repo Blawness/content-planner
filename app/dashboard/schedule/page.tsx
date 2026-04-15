@@ -356,7 +356,7 @@ export default function SchedulePage() {
       {/* CRUD Modal */}
       {showCrudModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl my-8 overflow-hidden">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl my-8 overflow-visible">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingIndex === null ? '➕ Tambah Baris Manual' : '✏️ Edit Baris'}
@@ -397,7 +397,7 @@ export default function SchedulePage() {
                   <DatePicker
                     id="date"
                     selected={parseUiDate(formRow.date)}
-                    onChange={(date) => {
+                    onChange={(date: Date | null) => {
                       if (!date) {
                         handleFormRowChange('date', '')
                         handleFormRowChange('day', '')
@@ -412,7 +412,7 @@ export default function SchedulePage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     calendarClassName="text-sm"
                     popperClassName="z-[60]"
-                    withPortal
+                    popperPlacement="bottom-start"
                   />
                 </div>
                 <div>
