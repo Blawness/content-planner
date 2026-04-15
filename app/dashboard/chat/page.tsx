@@ -52,13 +52,13 @@ const markdownComponents: Components = {
   th: ({ children }) => <th className="border-b border-gray-200 px-3 py-2 font-semibold">{children}</th>,
   td: ({ children }) => <td className="border-b border-gray-100 px-3 py-2 align-top">{children}</td>,
   hr: () => <hr className="my-3 border-gray-300" />,
-  code: ({ inline, children }) =>
-    inline ? (
-      <code className="rounded bg-gray-200 px-1.5 py-0.5 font-mono text-[12px] text-gray-800">
+  code: ({ className, children }) =>
+    className ? (
+      <code className="block overflow-x-auto rounded-md bg-gray-900 p-3 font-mono text-[12px] leading-6 text-gray-100">
         {children}
       </code>
     ) : (
-      <code className="block overflow-x-auto rounded-md bg-gray-900 p-3 font-mono text-[12px] leading-6 text-gray-100">
+      <code className="rounded bg-gray-200 px-1.5 py-0.5 font-mono text-[12px] text-gray-800">
         {children}
       </code>
     ),

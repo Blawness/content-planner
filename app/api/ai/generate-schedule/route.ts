@@ -45,25 +45,28 @@ function normalizeRow(row: unknown): ContentPlanRow {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function parseAiResponse(aiContent: string): ContentPlanRow[] {
-  let jsonResponse;
+  let jsonResponse: unknown;
   try {
     jsonResponse = JSON.parse(aiContent);
 
     // Handle different response formats
-    if (jsonResponse.schedule && Array.isArray(jsonResponse.schedule)) {
+    if (isRecord(jsonResponse) && Array.isArray(jsonResponse.schedule)) {
       jsonResponse = jsonResponse.schedule;
-    } else if (jsonResponse.rows && Array.isArray(jsonResponse.rows)) {
+    } else if (isRecord(jsonResponse) && Array.isArray(jsonResponse.rows)) {
       jsonResponse = jsonResponse.rows;
     } else if (!Array.isArray(jsonResponse)) {
       // Check if it's a single ContentPlanRow object (has the required keys)
       const requiredKeys = ['week_label', 'date', 'day', 'topic', 'format', 'headline'];
-      const hasRequiredKeys = requiredKeys.some(key => key in jsonResponse);
-
-      if (hasRequiredKeys && typeof jsonResponse === 'object') {
+      const recordResponse = isRecord(jsonResponse) ? jsonResponse : null;
+      if (recordResponse && requiredKeys.some((key) => key in recordResponse)) {
         // It's a single row, wrap it in an array
         console.log("AI returned single object, wrapping in array");
-        jsonResponse = [jsonResponse];
+        jsonResponse = [recordResponse];
       }
     }
   } catch (e) {
@@ -72,7 +75,11 @@ function parseAiResponse(aiContent: string): ContentPlanRow[] {
   }
 
   if (!Array.isArray(jsonResponse)) {
-    console.error("AI response is not an array:", typeof jsonResponse, Object.keys(jsonResponse || {}));
+    console.error(
+      "AI response is not an array:",
+      typeof jsonResponse,
+      isRecord(jsonResponse) ? Object.keys(jsonResponse) : []
+    );
     throw new Error(`AI returned invalid payload - expected array, got ${typeof jsonResponse}`);
   }
 
