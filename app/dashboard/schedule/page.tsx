@@ -76,12 +76,14 @@ export default function SchedulePage() {
   const [showAiModal, setShowAiModal] = useState(false)
 
   // AI form state
-  const [contentPerWeek, setContentPerWeek] = useState(3)
+  // Default AI generator: 1 konten per minggu
+  const [contentPerWeek, setContentPerWeek] = useState(1)
   const [platform, setPlatform] = useState(PLATFORMS[0])
   const [niche, setNiche] = useState('')
   const [contentIdea, setContentIdea] = useState('')
   const [monthLabel, setMonthLabel] = useState('')
-  const [durationWeeks, setDurationWeeks] = useState(2)
+  // Default AI generator: durasi 1 minggu
+  const [durationWeeks, setDurationWeeks] = useState(1)
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [tone, setTone] = useState(TONES[0])
   const [aiTargetAudience, setAiTargetAudience] = useState('')
@@ -243,11 +245,15 @@ export default function SchedulePage() {
                     return [...withIds, ...saved]
                   })
                 }
+                setStreamMessage(`Tersimpan! ${saved.length} konten berhasil disimpan ke database.`)
               } catch (err) {
                 console.error('Failed to save to DB:', err)
+                setAiError(
+                  `Konten berhasil digenerate tapi gagal disimpan ke database: ${err instanceof Error ? err.message : 'Unknown error'}. Coba refresh halaman.`
+                )
               } finally {
                 setLoading(false)
-                setTimeout(() => setShowAiModal(false), 800)
+                setTimeout(() => setShowAiModal(false), 1500)
               }
             })()
           },

@@ -5,7 +5,7 @@ import { predictTask } from '@/lib/api/ai'
 
 export function TaskPredictionBadge({
   taskId,
-  taskTitle,
+  taskTitle: _taskTitle,
   token,
 }: {
   taskId: string
@@ -17,11 +17,18 @@ export function TaskPredictionBadge({
 
   useEffect(() => {
     if (!token) return
-    setLoading(true)
-    predictTask(taskId, token)
-      .then((res) => setPrediction({ predictedHours: res.predictedHours, confidence: res.confidence }))
-      .catch(() => setPrediction(null))
-      .finally(() => setLoading(false))
+    const run = async () => {
+      setLoading(true)
+      try {
+        const res = await predictTask(taskId, token)
+        setPrediction({ predictedHours: res.predictedHours, confidence: res.confidence })
+      } catch {
+        setPrediction(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    run()
   }, [taskId, token])
 
   if (loading || !prediction) return null

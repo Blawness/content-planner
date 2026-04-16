@@ -32,20 +32,22 @@ function normalizeRow(row: unknown): ContentPlanRow {
 }
 
 function parseAiResponse(aiContent: string): ContentPlanRow[] {
-  let jsonResponse: any;
+  let jsonResponse: unknown;
   try {
     jsonResponse = JSON.parse(aiContent);
 
-    if (jsonResponse.schedule && Array.isArray(jsonResponse.schedule)) {
-      jsonResponse = jsonResponse.schedule;
-    } else if (jsonResponse.rows && Array.isArray(jsonResponse.rows)) {
-      jsonResponse = jsonResponse.rows;
-    } else if (!Array.isArray(jsonResponse)) {
-      const requiredKeys = ['week_label', 'date', 'day', 'topic', 'format', 'headline'];
-      const hasRequiredKeys = requiredKeys.some(key => key in jsonResponse);
-
-      if (hasRequiredKeys && typeof jsonResponse === 'object') {
-        jsonResponse = [jsonResponse];
+    if (jsonResponse !== null && typeof jsonResponse === 'object' && !Array.isArray(jsonResponse)) {
+      const obj = jsonResponse as Record<string, unknown>;
+      if (Array.isArray(obj.schedule)) {
+        jsonResponse = obj.schedule;
+      } else if (Array.isArray(obj.rows)) {
+        jsonResponse = obj.rows;
+      } else {
+        const requiredKeys = ['week_label', 'date', 'day', 'topic', 'format', 'headline'];
+        const hasRequiredKeys = requiredKeys.some(key => key in obj);
+        if (hasRequiredKeys) {
+          jsonResponse = [jsonResponse];
+        }
       }
     }
   } catch (e) {
@@ -125,7 +127,6 @@ export async function POST(request: NextRequest) {
             requestCount++;
 
             const itemsNeeded = totalItems - normalizedSchedule.length;
-            const weeksNeeded = Math.ceil(itemsNeeded / maxPosts);
             const currentWeek = Math.min(weekIndex + 1, maxWeeks);
             const weeksForThisRequest = Math.ceil(itemsNeeded / itemsPerRequest / maxPosts) || 1;
             const endWeek = Math.min(currentWeek + weeksForThisRequest - 1, maxWeeks);

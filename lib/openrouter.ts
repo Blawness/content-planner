@@ -8,7 +8,7 @@ export async function openRouterChat(
     throw new Error('OPENROUTER_API_KEY is not set');
   }
 
-  const bodyData: any = {
+  const bodyData: { model: string; messages: { role: string; content: string }[]; response_format?: { type: string } } = {
     model,
     messages,
   };

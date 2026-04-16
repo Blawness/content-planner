@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     let jsonResponse;
     try {
       jsonResponse = JSON.parse(aiContent);
-    } catch (e) {
+    } catch {
       console.error("Failed to parse AI JSON for prediction:", aiContent);
       return NextResponse.json(
         { message: 'AI returned invalid JSON format', raw: aiContent },

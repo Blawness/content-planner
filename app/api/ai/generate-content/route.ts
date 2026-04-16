@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       if (!Array.isArray(jsonResponse) && jsonResponse.ideas) {
         jsonResponse = jsonResponse.ideas;
       }
-    } catch (e) {
+    } catch {
       console.error("Failed to parse AI JSON:", aiContent);
       return NextResponse.json(
         { message: 'AI returned invalid JSON format', raw: aiContent },

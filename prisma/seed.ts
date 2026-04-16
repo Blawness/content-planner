@@ -24,7 +24,7 @@ async function main() {
 
   // ─── Create superuser ────────────────────────────────────────────────────────
   const superHash = await bcrypt.hash('superpassword123', 10)
-  const superuser = await prisma.user.create({
+  await prisma.user.create({
     data: {
       email: 'super@example.com',
       passwordHash: superHash,

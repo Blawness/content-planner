@@ -20,7 +20,7 @@ export function useGenerateScheduleStream() {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const generateScheduleStream = useCallback(
-    async (payload: any, token: string | null, callbacks: StreamCallbacks) => {
+    async (payload: Record<string, unknown>, token: string | null, callbacks: StreamCallbacks) => {
       return new Promise<void>((resolve, reject) => {
         try {
           if (!token) {

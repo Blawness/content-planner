@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { getProject } from '@/lib/api/projects'
@@ -35,7 +35,6 @@ export default function ProjectDetailPage() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [adding, setAdding] = useState(false)
   const { token, isGuest } = useAuth()
-  const router = useRouter()
 
   function load() {
     if (isGuest && (id === 'demo-1' || id === 'demo-2')) {

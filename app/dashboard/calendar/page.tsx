@@ -75,7 +75,7 @@ export default function CalendarPage() {
             </thead>
             <tbody>
               <tr>
-                {DAYS.map((d, i) => {
+                {DAYS.map((d, _i) => {
                   const slot = DEMO_WEEKS[0].slots.find((s) => s.day === d)
                   return (
                     <td key={d} className="p-2 border-b border-gray-100 align-top">

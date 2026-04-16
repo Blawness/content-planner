@@ -139,7 +139,6 @@ export async function POST(request: Request) {
 
       // Calculate weeks for this iteration
       const itemsNeeded = totalItems - normalizedSchedule.length;
-      const weeksNeeded = Math.ceil(itemsNeeded / maxPosts);
       const currentWeek = Math.min(weekIndex + 1, maxWeeks);
       const weeksForThisRequest = Math.ceil(itemsNeeded / itemsPerRequest / maxPosts) || 1;
       const endWeek = Math.min(currentWeek + weeksForThisRequest - 1, maxWeeks);

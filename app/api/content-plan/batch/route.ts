@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
+import type { ContentPlanItem } from '@prisma/client'
 
-function rowToResponse(item: any) {
+interface ContentPlanInput {
+  week_label?: string
+  date?: string
+  day?: string
+  topic?: string
+  format?: string
+  headline?: string
+  visual_description?: string | null
+  content_body?: string | null
+  hook_caption?: string | null
+  scheduled_time?: string
+  status?: string
+  notes?: string
+}
+
+function rowToResponse(item: ContentPlanItem) {
   return {
     id: item.id,
     week_label: item.weekLabel,
@@ -33,7 +49,7 @@ export async function POST(request: NextRequest) {
     const startOrder = await prisma.contentPlanItem.count({ where: { userId } })
 
     const created = await prisma.$transaction(
-      items.map((item: any, idx: number) =>
+      items.map((item: ContentPlanInput, idx: number) =>
         prisma.contentPlanItem.create({
           data: {
             userId,

@@ -33,28 +33,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const guestCookie = document.cookie.includes(`${GUEST_COOKIE}=1`)
-    if (guestCookie) {
-      setUser(GUEST_USER)
-      setIsGuest(true)
-      setIsLoading(false)
-      return
-    }
-    const storedToken = sessionStorage.getItem(TOKEN_KEY)
-    const storedUser = sessionStorage.getItem(USER_KEY)
-    if (storedToken && storedUser) {
-      setToken(storedToken)
-      document.cookie = `content_planner_token=${storedToken}; path=/; max-age=86400; SameSite=Lax`
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch {
-        sessionStorage.removeItem(USER_KEY)
-        sessionStorage.removeItem(TOKEN_KEY)
-        document.cookie = 'content_planner_token=; path=/; max-age=0'
+    const init = () => {
+      if (typeof window === 'undefined') return
+      const guestCookie = document.cookie.includes(`${GUEST_COOKIE}=1`)
+      if (guestCookie) {
+        setUser(GUEST_USER)
+        setIsGuest(true)
+        setIsLoading(false)
+        return
       }
+      const storedToken = sessionStorage.getItem(TOKEN_KEY)
+      const storedUser = sessionStorage.getItem(USER_KEY)
+      if (storedToken && storedUser) {
+        setToken(storedToken)
+        document.cookie = `content_planner_token=${storedToken}; path=/; max-age=86400; SameSite=Lax`
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch {
+          sessionStorage.removeItem(USER_KEY)
+          sessionStorage.removeItem(TOKEN_KEY)
+          document.cookie = 'content_planner_token=; path=/; max-age=0'
+        }
+      }
+      setIsLoading(false)
     }
-    setIsLoading(false)
+    init()
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {

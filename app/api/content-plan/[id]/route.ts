@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
+import type { ContentPlanItem } from '@prisma/client'
 
-function rowToResponse(item: any) {
+function rowToResponse(item: ContentPlanItem) {
   return {
     id: item.id,
     week_label: item.weekLabel,

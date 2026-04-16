@@ -20,19 +20,22 @@ export default function ProjectsListPage() {
   const { token, isGuest } = useAuth()
 
   useEffect(() => {
-    if (isGuest) {
-      setProjects(DEMO_PROJECTS)
-      setLoading(false)
-      return
+    const run = () => {
+      if (isGuest) {
+        setProjects(DEMO_PROJECTS)
+        setLoading(false)
+        return
+      }
+      if (!token) {
+        setLoading(false)
+        return
+      }
+      getProjects(token)
+        .then(setProjects)
+        .catch((err) => setError(err instanceof Error ? err.message : 'Gagal memuat proyek'))
+        .finally(() => setLoading(false))
     }
-    if (!token) {
-      setLoading(false)
-      return
-    }
-    getProjects(token)
-      .then(setProjects)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Gagal memuat proyek'))
-      .finally(() => setLoading(false))
+    run()
   }, [token, isGuest])
 
   if (loading) {
