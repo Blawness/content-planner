@@ -57,6 +57,7 @@ export type ScheduleSlot = {
 }
 
 export type ContentPlanRow = {
+  id?: string
   week_label: string
   date: string
   day: string

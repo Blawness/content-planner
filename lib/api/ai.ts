@@ -16,6 +16,9 @@ export type GenerateSchedulePayload = {
   content_idea?: string
   month_label?: string
   duration_weeks: number
+  start_date?: string
+  tone?: string
+  target_audience?: string
 }
 
 export async function generateContent(

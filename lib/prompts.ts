@@ -31,7 +31,10 @@ export const generateSchedulePrompt = (
   niche: string,
   contentIdea: string | undefined,
   durationWeeks: number,
-  monthLabel: string | undefined
+  monthLabel: string | undefined,
+  startDate?: string,
+  tone?: string,
+  targetAudience?: string
 ) => `You are an expert Content Planner.
 Create a detailed Instagram-like content plan table for ${durationWeeks} weeks, with ${contentPerWeek} posts per week.
 Total: ${durationWeeks * contentPerWeek} content plan items.
@@ -41,6 +44,9 @@ Context:
 - Niche: ${niche}
 - Main idea/campaign: ${contentIdea || 'General brand awareness'}
 - Month/period label: ${monthLabel || 'Use reasonable period label from current date'}
+- Start date: ${startDate ? `Begin from ${startDate} (DD/MM/YYYY), distribute posts across days of the week sequentially from this date` : 'Use today as start date, estimate based on current context'}
+- Tone/Style: ${tone || 'Edukatif'}
+- Target Audience: ${targetAudience || 'General audience'}
 
 CRITICAL: Return ONLY a valid JSON ARRAY (start with [ and end with ]) containing ${durationWeeks * contentPerWeek} objects.
 Each object represents ONE table row with these keys:

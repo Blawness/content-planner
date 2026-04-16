@@ -27,9 +27,7 @@ function LoginForm() {
     setLoading(true)
     try {
       await login(email, password)
-      const done = typeof window !== 'undefined' && localStorage.getItem('content_planner_onboarding_done')
-      const target = from === '/dashboard' || done ? '/dashboard' : from || '/onboarding/workspace'
-      router.push(target)
+      router.push(from || '/dashboard')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')

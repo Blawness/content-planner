@@ -1,0 +1,78 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth'
+
+function rowToResponse(item: any) {
+  return {
+    id: item.id,
+    week_label: item.weekLabel,
+    date: item.date,
+    day: item.day,
+    topic: item.topic,
+    format: item.format,
+    headline: item.headline,
+    visual_description: item.visualDescription ?? '',
+    content_body: item.contentBody ?? '',
+    hook_caption: item.hookCaption ?? '',
+    scheduled_time: item.scheduledTime,
+    status: item.status,
+    notes: item.notes,
+  }
+}
+
+// PUT — update single item
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { sub: userId } = await requireAuth(request)
+    const { id } = await params
+    const existing = await prisma.contentPlanItem.findUnique({ where: { id } })
+    if (!existing || existing.userId !== userId) {
+      return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+    const body = await request.json()
+    const updated = await prisma.contentPlanItem.update({
+      where: { id },
+      data: {
+        weekLabel: body.week_label ?? existing.weekLabel,
+        date: body.date ?? existing.date,
+        day: body.day ?? existing.day,
+        topic: body.topic ?? existing.topic,
+        format: body.format ?? existing.format,
+        headline: body.headline ?? existing.headline,
+        visualDescription: body.visual_description !== undefined ? body.visual_description : existing.visualDescription,
+        contentBody: body.content_body !== undefined ? body.content_body : existing.contentBody,
+        hookCaption: body.hook_caption !== undefined ? body.hook_caption : existing.hookCaption,
+        scheduledTime: body.scheduled_time ?? existing.scheduledTime,
+        status: body.status ?? existing.status,
+        notes: body.notes ?? existing.notes,
+      },
+    })
+    return NextResponse.json(rowToResponse(updated))
+  } catch (e) {
+    if (e instanceof Response) return e
+    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+// DELETE — remove single item
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { sub: userId } = await requireAuth(request)
+    const { id } = await params
+    const existing = await prisma.contentPlanItem.findUnique({ where: { id } })
+    if (!existing || existing.userId !== userId) {
+      return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+    await prisma.contentPlanItem.delete({ where: { id } })
+    return new NextResponse(null, { status: 204 })
+  } catch (e) {
+    if (e instanceof Response) return e
+    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 })
+  }
+}

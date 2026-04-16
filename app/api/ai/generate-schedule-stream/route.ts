@@ -73,6 +73,9 @@ export async function POST(request: NextRequest) {
       content_idea: contentIdea,
       month_label: monthLabel,
       duration_weeks: durationWeeks = 4,
+      start_date: startDate,
+      tone,
+      target_audience: targetAudience,
     } = body;
     const nicheContext = niche || theme;
 
@@ -145,7 +148,10 @@ export async function POST(request: NextRequest) {
               nicheContext,
               contentIdea,
               Math.max(1, endWeek - currentWeek + 1),
-              monthLabel ? `${monthLabel} (Minggu ${currentWeek}-${endWeek})` : undefined
+              monthLabel ? `${monthLabel} (Minggu ${currentWeek}-${endWeek})` : undefined,
+              startDate,
+              tone,
+              targetAudience
             );
 
             let aiContent: string;
@@ -201,9 +207,6 @@ export async function POST(request: NextRequest) {
                     total: totalItems
                   })}\n\n`)
                 );
-
-                // Small delay for visual feedback (optional)
-                await new Promise(resolve => setTimeout(resolve, 100));
               }
 
               console.log(`Request ${requestCount}: added ${batchRows.length} items, total: ${normalizedSchedule.length}`);

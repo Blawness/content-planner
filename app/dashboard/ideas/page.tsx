@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { generateContent } from '@/lib/api/ai'
 import type { ContentIdea } from '@/types'
@@ -19,6 +20,17 @@ export default function IdeasPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { token } = useAuth()
+  const router = useRouter()
+
+  function handleUseForSchedule() {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        'content_planner_schedule_prefill',
+        JSON.stringify({ niche, platform, goal, targetAudience })
+      )
+    }
+    router.push('/dashboard/schedule')
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -134,7 +146,12 @@ export default function IdeasPage() {
 
       {ideas.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Hasil</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Hasil</h2>
+            <Button type="button" variant="secondary" onClick={handleUseForSchedule} className="text-sm gap-2">
+              📅 Buat Content Plan dari Ide Ini
+            </Button>
+          </div>
           <ul className="space-y-4">
             {ideas.map((idea, i) => (
               <li key={i}>

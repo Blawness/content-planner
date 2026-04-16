@@ -21,7 +21,7 @@ export async function openRouterChat(
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'http://localhost:3000', // Update with actual URL in prod
+      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3008',
       'X-Title': 'AI Content Planner',
     },
     body: JSON.stringify(bodyData),

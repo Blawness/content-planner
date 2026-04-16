@@ -25,11 +25,12 @@ model User {
   isSuperuser  Boolean   @default(false) @map("is_superuser")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
-  workspaces      WorkspaceMember[]
-  assignedTasks   Task[]            @relation("TaskAssignee")
-  timeEntries     TimeEntry[]
-  aiRequests      AiRequest[]
+  ownedWorkspaces  Workspace[]       @relation("WorkspaceOwner")
+  workspaces       WorkspaceMember[]
+  assignedTasks    Task[]            @relation("TaskAssignee")
+  timeEntries      TimeEntry[]
+  aiRequests       AiRequest[]
+  contentPlanItems ContentPlanItem[]
 }
 
 model Workspace {
@@ -124,4 +125,29 @@ model AiRequest {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("ai_requests")
+}
+
+model ContentPlanItem {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  weekLabel         String   @map("week_label")
+  date              String
+  day               String
+  topic             String
+  format            String
+  headline          String
+  visualDescription String?  @map("visual_description") @db.Text
+  contentBody       String?  @map("content_body") @db.Text
+  hookCaption       String?  @map("hook_caption") @db.Text
+  scheduledTime     String   @map("scheduled_time")
+  status            String
+  notes             String
+  sortOrder         Int      @default(0) @map("sort_order")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sortOrder])
+  @@map("content_plan_items")
 }

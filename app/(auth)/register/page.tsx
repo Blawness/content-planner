@@ -24,7 +24,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await register(email, password)
-      router.push('/onboarding/workspace')
+      router.push('/dashboard')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
