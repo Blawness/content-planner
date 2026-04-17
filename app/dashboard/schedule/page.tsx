@@ -319,7 +319,7 @@ export default function SchedulePage() {
                               onClick={() => setExpandedIndex(isExpanded ? null : globalIndex)}
                               className="w-full px-4 md:px-6 py-4 text-left"
                             >
-                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4 items-center">
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[5rem_minmax(0,1fr)_auto_minmax(0,2fr)_auto] gap-2 md:gap-4 items-center">
                                 <div className="col-span-1">
                                   <p className="text-sm font-medium text-gray-900">{row.date}</p>
                                   <p className="text-xs text-gray-500">{row.day}</p>
