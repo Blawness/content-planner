@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import { format, isValid, parse } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { CalendarClock, ChevronDown, PencilLine, Sparkles, WandSparkles } from 'lucide-react'
+import { CalendarClock, CheckCheck, ChevronDown, Keyboard, PencilLine, Sparkles, Trash2, WandSparkles } from 'lucide-react'
 
 import type { ContentPlanRow } from '@/types'
 import { useAuth } from '@/components/providers/AuthProvider'
@@ -91,6 +91,10 @@ const EMPTY_ROW: ContentPlanRow = {
   notes: 'Baru',
 }
 
+type PreviewRow = ContentPlanRow & {
+  preview_id: string
+}
+
 function getStatusCellClass(status: string) {
   const normalized = status.toLowerCase()
   if (normalized.includes('done')) return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
@@ -112,13 +116,39 @@ function getUiDay(date: Date) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-function sortRows(rows: ContentPlanRow[]) {
+function sortRows<T extends ContentPlanRow>(rows: T[]) {
   return [...rows].sort((a, b) => {
     const dateA = parseUiDate(a.date)
     const dateB = parseUiDate(b.date)
     if (!dateA || !dateB) return a.week_label.localeCompare(b.week_label)
     return dateA.getTime() - dateB.getTime()
   })
+}
+
+function createPreviewRow(row: ContentPlanRow): PreviewRow {
+  return {
+    ...row,
+    preview_id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  }
+}
+
+function stripPreviewRows(rows: PreviewRow[]): ContentPlanRow[] {
+  return rows.map(({ preview_id: _previewId, ...row }) => row)
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min
+  return Math.min(Math.max(value, min), max)
+}
+
+function renderValidationList(items: string[]) {
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  )
 }
 
 export default function SchedulePage() {
@@ -152,11 +182,15 @@ export default function SchedulePage() {
   const [aiTargetAudience, setAiTargetAudience] = useState('')
   const [replaceExisting, setReplaceExisting] = useState(false)
   const [aiError, setAiError] = useState('')
-  const [previewRows, setPreviewRows] = useState<ContentPlanRow[]>([])
+  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
   const [savingPreview, setSavingPreview] = useState(false)
   const [streamProgress, setStreamProgress] = useState({ current: 0, total: 0 })
   const [streamMessage, setStreamMessage] = useState('')
+  const [selectedPreviewIds, setSelectedPreviewIds] = useState<string[]>([])
+  const [bulkStatus, setBulkStatus] = useState(STATUS_OPTIONS[0])
+  const [bulkFormat, setBulkFormat] = useState(FORMAT_OPTIONS[0])
+  const [bulkTime, setBulkTime] = useState('10:00 WIB')
   const isUnauthorized = !authLoading && !token
 
   const pendingItemsRef = useRef<ContentPlanRow[]>([])
@@ -176,7 +210,47 @@ export default function SchedulePage() {
     [previewRows]
   )
 
-  const estimatedCount = contentPerWeek * durationWeeks
+  const normalizedContentPerWeek = clampNumber(Math.trunc(contentPerWeek || 0), 1, 14)
+  const normalizedDurationWeeks = clampNumber(Math.trunc(durationWeeks || 0), 1, 12)
+  const estimatedCount = normalizedContentPerWeek * normalizedDurationWeeks
+  const step0BlockingIssues = useMemo(() => {
+    const issues: string[] = []
+    if (!selectedPresetId) issues.push('Pilih salah satu preset untuk memberi arah hasil AI.')
+    if (!platform) issues.push('Pilih platform utama.')
+    if (niche.trim().length < 3) issues.push('Isi niche minimal 3 karakter agar brief cukup jelas.')
+    return issues
+  }, [niche, platform, selectedPresetId])
+  const step0Hints = useMemo(() => {
+    const hints: string[] = []
+    if (!aiTargetAudience.trim()) hints.push('Target audience belum wajib, tetapi akan membantu AI membuat hook yang lebih tajam.')
+    return hints
+  }, [aiTargetAudience])
+  const step1BlockingIssues = useMemo(() => {
+    const issues: string[] = []
+    if (!contentIdea.trim()) issues.push('Isi campaign atau angle utama sebelum membuat preview.')
+    if (!tone) issues.push('Pilih tone konten.')
+    if (!Number.isInteger(contentPerWeek) || contentPerWeek < 1 || contentPerWeek > 14) {
+      issues.push('Konten per minggu harus antara 1 sampai 14.')
+    }
+    if (!Number.isInteger(durationWeeks) || durationWeeks < 1 || durationWeeks > 12) {
+      issues.push('Durasi minggu harus antara 1 sampai 12.')
+    }
+    return issues
+  }, [contentIdea, contentPerWeek, durationWeeks, tone])
+  const step1Hints = useMemo(() => {
+    const hints: string[] = []
+    if (!startDate) hints.push('Tanggal mulai kosong. AI tetap bisa berjalan, tetapi urutan tanggal akan lebih presisi jika diisi.')
+    if (estimatedCount > 20) hints.push('Estimasi output cukup besar. Pertimbangkan preview bertahap agar review lebih cepat.')
+    return hints
+  }, [estimatedCount, startDate])
+  const selectedPreviewRows = useMemo(
+    () => previewRows.filter((row) => selectedPreviewIds.includes(row.preview_id)),
+    [previewRows, selectedPreviewIds]
+  )
+  const saveTargetRows = selectedPreviewRows.length > 0 ? selectedPreviewRows : previewRows
+  const canAdvanceToConfiguration = step0BlockingIssues.length === 0
+  const canGeneratePreview = step1BlockingIssues.length === 0 && !previewLoading
+  const canSavePreview = !previewLoading && !savingPreview && saveTargetRows.length > 0
 
   const setWizardDefaultsFromPreset = useCallback((presetId: string) => {
     const preset = AI_PRESETS.find((item) => item.id === presetId)
@@ -203,11 +277,27 @@ export default function SchedulePage() {
     setSavingPreview(false)
     setStreamProgress({ current: 0, total: 0 })
     setStreamMessage('')
+    setSelectedPreviewIds([])
+    setBulkStatus(STATUS_OPTIONS[0])
+    setBulkFormat(FORMAT_OPTIONS[0])
+    setBulkTime('10:00 WIB')
     pendingItemsRef.current = []
   }, [setWizardDefaultsFromPreset])
 
-  const openAiWizard = useCallback(() => {
-    resetWizardState()
+  const openAiWizard = useCallback((options?: { preserveDraft?: boolean }) => {
+    if (!options?.preserveDraft) {
+      resetWizardState()
+    } else {
+      setWizardStep(0)
+      setAiError('')
+      setPreviewRows([])
+      setPreviewLoading(false)
+      setSavingPreview(false)
+      setStreamProgress({ current: 0, total: 0 })
+      setStreamMessage('')
+      setSelectedPreviewIds([])
+      pendingItemsRef.current = []
+    }
     setShowAiModal(true)
   }, [resetWizardState])
 
@@ -219,6 +309,7 @@ export default function SchedulePage() {
     setSavingPreview(false)
     setStreamProgress({ current: 0, total: 0 })
     setStreamMessage('')
+    setSelectedPreviewIds([])
   }, [])
 
   const openCreateModal = useCallback(() => {
@@ -255,16 +346,50 @@ export default function SchedulePage() {
     if (!raw) return
     try {
       const data = JSON.parse(raw)
+      openAiWizard({ preserveDraft: true })
       if (data.niche) setNiche(data.niche)
       if (data.platform) setPlatform(data.platform)
       if (data.goal) setContentIdea(data.goal)
       if (data.targetAudience) setAiTargetAudience(data.targetAudience)
-      openAiWizard()
     } catch {
       // Ignore invalid local storage payload.
     }
     localStorage.removeItem('content_planner_schedule_prefill')
   }, [openAiWizard])
+
+  const selectAllPreviewRows = useCallback(() => {
+    setSelectedPreviewIds(previewRows.map((row) => row.preview_id))
+  }, [previewRows])
+
+  const clearPreviewSelection = useCallback(() => {
+    setSelectedPreviewIds([])
+  }, [])
+
+  const togglePreviewRow = useCallback((previewId: string) => {
+    setSelectedPreviewIds((prev) =>
+      prev.includes(previewId) ? prev.filter((item) => item !== previewId) : [...prev, previewId]
+    )
+  }, [])
+
+  const selectPreviewWeek = useCallback((weekLabel: string) => {
+    const weekIds = previewRows.filter((row) => row.week_label === weekLabel).map((row) => row.preview_id)
+    setSelectedPreviewIds((prev) => Array.from(new Set([...prev, ...weekIds])))
+  }, [previewRows])
+
+  const applyBulkPreviewUpdate = useCallback((updater: (row: PreviewRow) => PreviewRow) => {
+    const targetIds = new Set(
+      selectedPreviewIds.length > 0 ? selectedPreviewIds : previewRows.map((row) => row.preview_id)
+    )
+    setPreviewRows((prev) => sortRows(prev.map((row) => (targetIds.has(row.preview_id) ? updater(row) : row))))
+  }, [previewRows, selectedPreviewIds])
+
+  const handleBulkRemove = useCallback(() => {
+    const targetIds = new Set(
+      selectedPreviewIds.length > 0 ? selectedPreviewIds : previewRows.map((row) => row.preview_id)
+    )
+    setPreviewRows((prev) => prev.filter((row) => !targetIds.has(row.preview_id)))
+    setSelectedPreviewIds([])
+  }, [previewRows, selectedPreviewIds])
 
   function handleFormRowChange<K extends keyof ContentPlanRow>(key: K, value: ContentPlanRow[K]) {
     setFormRow((prev) => ({ ...prev, [key]: value }))
@@ -330,11 +455,12 @@ export default function SchedulePage() {
     }
   }
 
-  async function handlePreviewGenerate() {
+  const handlePreviewGenerate = useCallback(async () => {
     if (!token) return
     setAiError('')
     setPreviewRows([])
     setPreviewLoading(true)
+    setSelectedPreviewIds([])
     setWizardStep(2)
     setStreamProgress({ current: 0, total: 0 })
     setStreamMessage('')
@@ -343,12 +469,12 @@ export default function SchedulePage() {
     try {
       await generateScheduleStream(
         {
-          content_per_week: contentPerWeek,
+          content_per_week: normalizedContentPerWeek,
           platform,
           niche,
           content_idea: contentIdea || undefined,
           month_label: monthLabel || undefined,
-          duration_weeks: durationWeeks,
+          duration_weeks: normalizedDurationWeeks,
           start_date: startDate ? format(startDate, 'dd/MM/yyyy') : undefined,
           tone,
           target_audience: aiTargetAudience || undefined,
@@ -364,13 +490,14 @@ export default function SchedulePage() {
             setStreamProgress({ current: generated, total })
           },
           onItem: (item, count, total) => {
+            const previewItem = createPreviewRow(item)
             pendingItemsRef.current.push(item)
-            setPreviewRows((prev) => sortRows([...prev, item]))
+            setPreviewRows((prev) => sortRows([...prev, previewItem]))
             setStreamProgress({ current: count, total })
             setStreamMessage(`Preview ${count}/${total} siap direview`)
           },
           onComplete: (total, message) => {
-            setPreviewRows(sortRows([...pendingItemsRef.current]))
+            setPreviewRows(sortRows(pendingItemsRef.current.map((row) => createPreviewRow(row))))
             setStreamProgress({ current: total, total })
             setStreamMessage(message)
             setPreviewLoading(false)
@@ -385,10 +512,10 @@ export default function SchedulePage() {
       setAiError(err instanceof Error ? err.message : 'Gagal membuat preview AI')
       setPreviewLoading(false)
     }
-  }
+  }, [aiTargetAudience, contentIdea, generateScheduleStream, monthLabel, niche, normalizedContentPerWeek, normalizedDurationWeeks, platform, startDate, token, tone])
 
-  async function handleSavePreview() {
-    if (!token || previewRows.length === 0) return
+  const handleSavePreview = useCallback(async () => {
+    if (!token || saveTargetRows.length === 0) return
     setSavingPreview(true)
     setAiError('')
 
@@ -396,7 +523,7 @@ export default function SchedulePage() {
       if (replaceExisting) {
         await deleteAllContentPlan(token)
       }
-      const saved = await batchCreateContentPlan(previewRows, token)
+      const saved = await batchCreateContentPlan(stripPreviewRows(saveTargetRows), token)
       setRows((prev) => sortRows(replaceExisting ? saved : [...prev, ...saved]))
       setStreamMessage(`Tersimpan. ${saved.length} item masuk ke Content Plan.`)
       setTimeout(() => closeAiWizard(), 700)
@@ -405,7 +532,71 @@ export default function SchedulePage() {
     } finally {
       setSavingPreview(false)
     }
-  }
+  }, [closeAiWizard, replaceExisting, saveTargetRows, token])
+
+  useEffect(() => {
+    if (!showAiModal) return
+
+    function onKeyDown(event: KeyboardEvent) {
+      const key = event.key.toLowerCase()
+      const hasPrimaryModifier = event.ctrlKey || event.metaKey
+
+      if (hasPrimaryModifier && key === 'enter') {
+        event.preventDefault()
+        if (wizardStep === 0 && canAdvanceToConfiguration) {
+          setWizardStep(1)
+        } else if (wizardStep === 1 && canGeneratePreview) {
+          void handlePreviewGenerate()
+        } else if (wizardStep === 2 && canSavePreview) {
+          void handleSavePreview()
+        }
+        return
+      }
+
+      if (event.altKey && event.key === 'ArrowLeft' && wizardStep > 0 && !previewLoading && !savingPreview) {
+        event.preventDefault()
+        setWizardStep((prev) => Math.max(prev - 1, 0))
+        return
+      }
+
+      if (event.altKey && event.key === 'ArrowRight') {
+        event.preventDefault()
+        if (wizardStep === 0 && canAdvanceToConfiguration) {
+          setWizardStep(1)
+        } else if (wizardStep === 1 && canGeneratePreview) {
+          void handlePreviewGenerate()
+        }
+        return
+      }
+
+      if (wizardStep === 2 && event.shiftKey && key === 'a' && previewRows.length > 0) {
+        event.preventDefault()
+        selectAllPreviewRows()
+        return
+      }
+
+      if (wizardStep === 2 && event.shiftKey && key === 'x') {
+        event.preventDefault()
+        clearPreviewSelection()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [
+    canAdvanceToConfiguration,
+    canGeneratePreview,
+    canSavePreview,
+    clearPreviewSelection,
+    handlePreviewGenerate,
+    handleSavePreview,
+    previewLoading,
+    previewRows.length,
+    savingPreview,
+    selectAllPreviewRows,
+    showAiModal,
+    wizardStep,
+  ])
 
   function renderRows(groupRows: ContentPlanRow[]) {
     return groupRows.map((row, idx) => {
@@ -500,7 +691,7 @@ export default function SchedulePage() {
               <PencilLine className="size-4" />
               Tambah Manual
             </Button>
-            <Button type="button" onClick={openAiWizard}>
+            <Button type="button" onClick={() => openAiWizard()}>
               <WandSparkles className="size-4" />
               AI Wizard
             </Button>
@@ -522,7 +713,7 @@ export default function SchedulePage() {
               <Button type="button" variant="outline" onClick={openCreateModal}>
                 Tambah Manual
               </Button>
-              <Button type="button" onClick={openAiWizard}>
+              <Button type="button" onClick={() => openAiWizard()}>
                 <Sparkles className="size-4" />
                 Buka AI Wizard
               </Button>
@@ -729,8 +920,37 @@ export default function SchedulePage() {
               </Alert>
             ) : null}
 
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col gap-3 py-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="font-medium">Shortcut keyboard</p>
+                  <p className="text-sm text-muted-foreground">Gunakan shortcut ini untuk review dan submit wizard lebih cepat.</p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1"><Keyboard className="size-3.5" />Ctrl/Cmd + Enter</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1">Alt + ← / →</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1">Shift + A</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1">Shift + X</span>
+                </div>
+              </CardContent>
+            </Card>
+
             {wizardStep === 0 ? (
               <div className="space-y-5">
+                {step0BlockingIssues.length > 0 ? (
+                  <Alert variant="destructive">
+                    <AlertTitle>Lengkapi step ini dulu</AlertTitle>
+                    <AlertDescription>{renderValidationList(step0BlockingIssues)}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                {step0Hints.length > 0 ? (
+                  <Alert>
+                    <AlertTitle>Context bisa dibuat lebih tajam</AlertTitle>
+                    <AlertDescription>{renderValidationList(step0Hints)}</AlertDescription>
+                  </Alert>
+                ) : null}
+
                 <FormSection
                   title="Pilih preset"
                   description="Preset memberi starting point yang lebih cepat. Anda tetap bisa mengubah semua parameter di langkah berikutnya."
@@ -808,6 +1028,20 @@ export default function SchedulePage() {
 
             {wizardStep === 1 ? (
               <div className="space-y-5">
+                {step1BlockingIssues.length > 0 ? (
+                  <Alert variant="destructive">
+                    <AlertTitle>Konfigurasi belum siap</AlertTitle>
+                    <AlertDescription>{renderValidationList(step1BlockingIssues)}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                {step1Hints.length > 0 ? (
+                  <Alert>
+                    <AlertTitle>Rekomendasi sebelum generate</AlertTitle>
+                    <AlertDescription>{renderValidationList(step1Hints)}</AlertDescription>
+                  </Alert>
+                ) : null}
+
                 <FormSection title="Konfigurasi plan" description="Atur parameter sebelum AI membuat preview. Semua hasil di step berikutnya masih aman untuk direview dulu.">
                   <FormField label="Preset aktif">
                     <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
@@ -862,6 +1096,7 @@ export default function SchedulePage() {
                         max={14}
                         value={contentPerWeek}
                         onChange={(e) => setContentPerWeek(Number(e.target.value))}
+                        onBlur={() => setContentPerWeek(normalizedContentPerWeek)}
                         className="h-10"
                       />
                     </FormField>
@@ -876,6 +1111,7 @@ export default function SchedulePage() {
                         max={12}
                         value={durationWeeks}
                         onChange={(e) => setDurationWeeks(Number(e.target.value))}
+                        onBlur={() => setDurationWeeks(normalizedDurationWeeks)}
                         className="h-10"
                       />
                     </FormField>
@@ -972,20 +1208,110 @@ export default function SchedulePage() {
                       <AlertDescription>Item di bawah belum masuk database. Simpan hanya jika hasilnya sudah sesuai.</AlertDescription>
                     </Alert>
 
+                    <Card>
+                      <CardHeader>
+                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <CardTitle className="text-base">Bulk actions untuk preview</CardTitle>
+                            <CardDescription>
+                              {selectedPreviewIds.length > 0
+                                ? `${selectedPreviewIds.length} baris dipilih. Aksi akan berlaku ke selection ini.`
+                                : 'Belum ada baris dipilih. Aksi akan berlaku ke semua preview rows.'}
+                            </CardDescription>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={selectAllPreviewRows}>
+                              <CheckCheck className="size-4" />
+                              Pilih Semua
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={clearPreviewSelection} disabled={selectedPreviewIds.length === 0}>
+                              Clear Selection
+                            </Button>
+                            <Button type="button" variant="destructive" size="sm" onClick={handleBulkRemove} disabled={previewRows.length === 0}>
+                              <Trash2 className="size-4" />
+                              Hapus dari Preview
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto]">
+                        <FormField label="Set status">
+                          <Select value={bulkStatus} onValueChange={(value) => setBulkStatus(value ?? STATUS_OPTIONS[0])}>
+                            <SelectTrigger className="h-10 w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS_OPTIONS.map((item) => (
+                                <SelectItem key={item} value={item}>{item}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormField>
+                        <div className="flex items-end">
+                          <Button type="button" variant="outline" onClick={() => applyBulkPreviewUpdate((row) => ({ ...row, status: bulkStatus }))}>
+                            Terapkan
+                          </Button>
+                        </div>
+
+                        <FormField label="Set format">
+                          <Select value={bulkFormat} onValueChange={(value) => setBulkFormat(value ?? FORMAT_OPTIONS[0])}>
+                            <SelectTrigger className="h-10 w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {FORMAT_OPTIONS.map((item) => (
+                                <SelectItem key={item} value={item}>{item}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormField>
+                        <div className="flex items-end">
+                          <Button type="button" variant="outline" onClick={() => applyBulkPreviewUpdate((row) => ({ ...row, format: bulkFormat }))}>
+                            Terapkan
+                          </Button>
+                        </div>
+
+                        <FormField label="Set waktu publish">
+                          <Input value={bulkTime} onChange={(e) => setBulkTime(e.target.value)} placeholder="10:00 WIB" className="h-10" />
+                        </FormField>
+                        <div className="flex items-end">
+                          <Button type="button" variant="outline" onClick={() => applyBulkPreviewUpdate((row) => ({ ...row, scheduled_time: bulkTime || '10:00 WIB' }))}>
+                            Terapkan
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
                     {previewWeekKeys.map((weekLabel) => {
                       const groupRows = previewRows.filter((row) => row.week_label === weekLabel)
                       return (
                         <Card key={weekLabel}>
                           <CardHeader className="border-b border-border bg-muted/40">
-                            <CardTitle className="text-base">{weekLabel}</CardTitle>
-                            <CardDescription>{groupRows.length} konten preview</CardDescription>
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                              <div>
+                                <CardTitle className="text-base">{weekLabel}</CardTitle>
+                                <CardDescription>{groupRows.length} konten preview</CardDescription>
+                              </div>
+                              <Button type="button" variant="outline" size="sm" onClick={() => selectPreviewWeek(weekLabel)}>
+                                Pilih minggu ini
+                              </Button>
+                            </div>
                           </CardHeader>
                           <CardContent className="space-y-3 pt-4">
-                            {groupRows.map((row, index) => (
-                              <div key={`${row.date}-${row.headline}-${index}`} className="rounded-xl border border-border bg-background p-4">
+                            {groupRows.map((row) => (
+                              <div key={row.preview_id} className={cn('rounded-xl border border-border bg-background p-4', selectedPreviewIds.includes(row.preview_id) ? 'ring-2 ring-ring/40' : undefined)}>
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                   <div className="space-y-1">
                                     <div className="flex flex-wrap items-center gap-2">
+                                      <label className="mr-1 inline-flex items-center gap-2 rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedPreviewIds.includes(row.preview_id)}
+                                          onChange={() => togglePreviewRow(row.preview_id)}
+                                          className="size-3.5 rounded border-border"
+                                        />
+                                        Pilih
+                                      </label>
                                       <p className="font-medium">{row.headline}</p>
                                       <Badge variant="outline">{row.format}</Badge>
                                     </div>
@@ -1020,7 +1346,7 @@ export default function SchedulePage() {
             {wizardStep === 0 ? (
               <>
                 <Button type="button" variant="outline" onClick={closeAiWizard}>Batal</Button>
-                <Button type="button" onClick={() => setWizardStep(1)} disabled={!niche.trim()}>
+                <Button type="button" onClick={() => setWizardStep(1)} disabled={!canAdvanceToConfiguration}>
                   Lanjut ke Konfigurasi
                 </Button>
               </>
@@ -1029,7 +1355,7 @@ export default function SchedulePage() {
             {wizardStep === 1 ? (
               <>
                 <Button type="button" variant="outline" onClick={() => setWizardStep(0)}>Kembali</Button>
-                <Button type="button" onClick={handlePreviewGenerate} disabled={!niche.trim() || previewLoading}>
+                <Button type="button" onClick={handlePreviewGenerate} disabled={!canGeneratePreview}>
                   {previewLoading ? 'Menyiapkan preview...' : 'Buat Preview AI'}
                 </Button>
               </>
@@ -1043,8 +1369,8 @@ export default function SchedulePage() {
                 <Button type="button" variant="outline" onClick={handlePreviewGenerate} disabled={previewLoading || savingPreview}>
                   Preview Ulang
                 </Button>
-                <Button type="button" onClick={handleSavePreview} disabled={previewLoading || savingPreview || previewRows.length === 0}>
-                  {savingPreview ? 'Menyimpan...' : 'Simpan ke Content Plan'}
+                <Button type="button" onClick={handleSavePreview} disabled={!canSavePreview}>
+                  {savingPreview ? 'Menyimpan...' : `Simpan ${saveTargetRows.length} Baris`}
                 </Button>
               </>
             ) : null}

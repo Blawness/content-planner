@@ -3,7 +3,7 @@ import type { ContentPlanRow } from '@/types';
 
 type StreamEvent =
   | { type: 'start'; total: number }
-  | { type: 'progress'; message: string; generated: number; total: number }
+  | { type: 'progress'; phase?: 'idea_generation' | 'detail_expansion'; message: string; generated: number; total: number }
   | { type: 'item'; data: ContentPlanRow; count: number; total: number }
   | { type: 'complete'; total: number; message: string }
   | { type: 'error'; message: string };

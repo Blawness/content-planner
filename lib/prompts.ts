@@ -95,6 +95,143 @@ Example (for 2 weeks, 2 posts per week = 4 items):
   }
 ]`;
 
+export const generateScheduleIdeasPrompt = (
+  totalItems: number,
+  platform: string,
+  niche: string,
+  contentIdea: string | undefined,
+  durationWeeks: number,
+  contentPerWeek: number,
+  tone?: string,
+  targetAudience?: string,
+  monthLabel?: string
+) => `You are an expert Content Strategist.
+Create exactly ${totalItems} UNIQUE content idea seeds for a ${durationWeeks}-week campaign with ${contentPerWeek} posts per week.
+
+Context:
+- Platform: ${platform}
+- Niche: ${niche}
+- Main campaign idea: ${contentIdea || 'General brand awareness'}
+- Tone/Style: ${tone || 'Edukatif'}
+- Target Audience: ${targetAudience || 'General audience'}
+- Month/Period label: ${monthLabel || 'Use current relevant period'}
+
+CRITICAL UNIQUENESS RULES:
+- Every item MUST have a different angle/subtopic.
+- DO NOT repeat same educational question with small wording changes.
+- If one item is "Apa itu SHM", others must use different subtopic/intent (e.g. risiko, langkah, studi kasus, biaya, kesalahan umum).
+- Avoid semantic duplicates across topic_seed, angle, and headline_seed.
+
+Return ONLY valid JSON in this format:
+{
+  "ideas": [
+    {
+      "topic_seed": "string",
+      "angle": "string",
+      "headline_seed": "string",
+      "format_hint": "Single Post | Carousel | Reels",
+      "hook_seed": "string"
+    }
+  ]
+}
+
+Rules:
+- Output MUST contain exactly ${totalItems} items in "ideas".
+- Use Bahasa Indonesia.
+- "format_hint" must be one of: Single Post, Carousel, Reels.
+- Do not include markdown or explanations.`;
+
+export const regenerateUniqueIdeaPrompt = (
+  platform: string,
+  niche: string,
+  contentIdea: string | undefined,
+  tone: string | undefined,
+  targetAudience: string | undefined,
+  forbiddenFingerprints: string[],
+  index: number
+) => `You are an expert Content Strategist.
+Generate ONE content idea seed that is strictly different from all forbidden themes below.
+
+Context:
+- Platform: ${platform}
+- Niche: ${niche}
+- Main campaign idea: ${contentIdea || 'General brand awareness'}
+- Tone/Style: ${tone || 'Edukatif'}
+- Target Audience: ${targetAudience || 'General audience'}
+- Item index: ${index}
+
+FORBIDDEN themes/fingerprints (MUST NOT be repeated in any close wording):
+${forbiddenFingerprints.map((item, i) => `${i + 1}. ${item}`).join('\n') || '- none'}
+
+Return ONLY valid JSON object:
+{
+  "topic_seed": "string",
+  "angle": "string",
+  "headline_seed": "string",
+  "format_hint": "Single Post | Carousel | Reels",
+  "hook_seed": "string"
+}
+
+Rules:
+- Use Bahasa Indonesia.
+- Must be semantically distinct from forbidden list.
+- "format_hint" must be one of: Single Post, Carousel, Reels.
+- No markdown, no explanation.`;
+
+export const generateScheduleDetailPrompt = (
+  platform: string,
+  niche: string,
+  tone: string | undefined,
+  targetAudience: string | undefined,
+  contentIdea: string | undefined,
+  idea: {
+    topic_seed: string;
+    angle: string;
+    headline_seed: string;
+    format_hint: string;
+    hook_seed: string;
+  },
+  weekNumber: number,
+  positionInWeek: number,
+  forbiddenFingerprints: string[]
+) => `You are an expert Social Media Content Writer.
+Expand ONE idea into practical content details.
+
+Context:
+- Platform: ${platform}
+- Niche: ${niche}
+- Campaign: ${contentIdea || 'General brand awareness'}
+- Tone: ${tone || 'Edukatif'}
+- Target Audience: ${targetAudience || 'General audience'}
+- Week number: ${weekNumber}
+- Slot in week: ${positionInWeek}
+
+Idea seed:
+- topic_seed: ${idea.topic_seed}
+- angle: ${idea.angle}
+- headline_seed: ${idea.headline_seed}
+- format_hint: ${idea.format_hint}
+- hook_seed: ${idea.hook_seed}
+
+Avoid producing content semantically similar to:
+${forbiddenFingerprints.map((item, i) => `${i + 1}. ${item}`).join('\n') || '- none'}
+
+Return ONLY valid JSON object:
+{
+  "topic": "string",
+  "format": "Single Post | Carousel | Reels",
+  "headline": "string",
+  "visual_description": "string",
+  "content_body": "string",
+  "hook_caption": "string"
+}
+
+Rules:
+- Use Bahasa Indonesia.
+- Keep it specific and directly usable.
+- Ensure this item stays unique compared with forbidden list.
+- No markdown, no explanation.`;
+
 export const predictTaskPrompt = (taskTitle: string) => `You are an expert Project Manager.
 Based on the following task title/description, predict the estimated time to complete it if done by a professional.
 Task: "${taskTitle}"
