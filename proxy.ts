@@ -12,8 +12,7 @@ export function proxy(request: NextRequest) {
   const guest = request.cookies.get('content_planner_guest')?.value
   const hasAccess = !!token || guest === '1'
   const isDashboard = pathname.startsWith('/dashboard')
-  const isOnboarding = pathname.startsWith('/onboarding')
-  if ((isDashboard || isOnboarding) && !hasAccess) {
+  if (isDashboard && !hasAccess) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('from', pathname)
     return NextResponse.redirect(loginUrl)
@@ -22,5 +21,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/onboarding/:path*'],
+  matcher: ['/dashboard/:path*'],
 }

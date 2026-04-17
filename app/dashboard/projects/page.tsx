@@ -68,7 +68,7 @@ export default function ProjectsListPage() {
       {projects.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12 text-gray-500">
-            Belum ada proyek. Buat proyek pertama dari onboarding atau tombol di atas.
+            Belum ada proyek. Klik tombol di atas untuk membuat proyek pertama.
           </CardContent>
         </Card>
       ) : (
