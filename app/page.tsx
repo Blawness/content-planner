@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { HomeActions } from '@/components/features/HomeActions'
 
 export default function HomePage() {
   return (
@@ -21,7 +20,6 @@ export default function HomePage() {
         >
           Register
         </Link>
-        <HomeActions />
       </div>
     </main>
   )

@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+
+import type { Task, TimeEntry } from '@/types'
 import { useAuth } from '@/components/providers/AuthProvider'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/Card'
+import { FormField, FormSection } from '@/components/ui/form-layout'
+import { PageEmptyState, PageErrorState, PageHeader, PageLoadingState, PageShell } from '@/components/ui/page-shell'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getTasks } from '@/lib/api/tasks'
 import { getTimeEntries, startTimeEntry, stopTimeEntry } from '@/lib/api/time-entries'
-import type { Task, TimeEntry } from '@/types'
-import { Card, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/button'
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -23,13 +27,16 @@ export default function TrackerPage() {
   const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const { token } = useAuth()
+  const { token, isLoading: authLoading } = useAuth()
+  const isUnauthorized = !authLoading && !token
 
   useEffect(() => {
     if (!token) return
+
     getTasks(token)
       .then(setTasks)
       .catch(() => setTasks([]))
+
     getTimeEntries(token)
       .then(setEntries)
       .catch(() => setEntries([]))
@@ -38,8 +45,8 @@ export default function TrackerPage() {
 
   useEffect(() => {
     if (!runningEntryId) return
-    const t = setInterval(() => setElapsed((e) => e + 1), 1000)
-    return () => clearInterval(t)
+    const timer = setInterval(() => setElapsed((prev) => prev + 1), 1000)
+    return () => clearInterval(timer)
   }, [runningEntryId])
 
   async function handleStart() {
@@ -49,8 +56,7 @@ export default function TrackerPage() {
       const entry = await startTimeEntry(selectedTaskId, token)
       setRunningEntryId(entry.id)
       setElapsed(0)
-      const list = await getTimeEntries(token)
-      setEntries(list)
+      setEntries(await getTimeEntries(token))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal start timer')
     }
@@ -62,98 +68,85 @@ export default function TrackerPage() {
     try {
       await stopTimeEntry(runningEntryId, token)
       setRunningEntryId(null)
-      const list = await getTimeEntries(token)
-      setEntries(list)
+      setEntries(await getTimeEntries(token))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal stop timer')
     }
   }
 
   const runningTask = runningEntryId
-    ? tasks.find((t) => entries.some((e) => e.id === runningEntryId && e.task_id === t.id))
+    ? tasks.find((task) => entries.some((entry) => entry.id === runningEntryId && entry.task_id === task.id))
     : null
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Time Tracker</h1>
-        <p className="text-gray-500">Memuat...</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-4">Time Tracker</h1>
-      <p className="text-gray-600 mb-6">Pilih task dan mulai timer untuk melacak waktu pengerjaan.</p>
+    <PageShell className="max-w-4xl">
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Time Tracker' },
+        ]}
+        eyebrow="Superuser Lab"
+        title="Time Tracker"
+        description="Pelacak waktu internal untuk task produksi. Flow user utama tetap tidak bergantung pada modul ini."
+      />
 
-      {error && (
-        <p className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded" role="alert">
-          {error}
-        </p>
-      )}
+      {authLoading || (token && loading) ? <PageLoadingState title="Memuat tracker" /> : null}
+      {!authLoading && isUnauthorized ? <PageErrorState description="Sesi login tidak ditemukan. Silakan login ulang." /> : null}
+      {!authLoading && !isUnauthorized && !loading && error ? <PageErrorState description={error} /> : null}
 
-      <Card className="mb-6">
-        <CardContent className="pt-4">
-          <label htmlFor="task" className="block text-sm font-medium text-gray-700 mb-2">
-            Pilih task
-          </label>
-          <select
-            id="task"
-            value={selectedTaskId ?? ''}
-            onChange={(e) => setSelectedTaskId(e.target.value || null)}
-            disabled={!!runningEntryId}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
-          >
-            <option value="">-- Pilih task --</option>
-            {tasks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title} {t.project_id ? `(Project)` : ''}
-              </option>
-            ))}
-          </select>
-          {tasks.length === 0 && (
-            <p className="text-sm text-gray-500 mb-4">Belum ada task. Buat task di Projects.</p>
+      {!authLoading && !isUnauthorized && !loading && !error ? (
+        <>
+          <FormSection title="Timer aktif" description="Pilih task lalu mulai timer untuk melacak waktu pengerjaan.">
+            <FormField label="Pilih task">
+              <Select value={selectedTaskId ?? ''} onValueChange={(value) => setSelectedTaskId(value || null)} disabled={Boolean(runningEntryId)}>
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder="Pilih task" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tasks.map((task) => (
+                    <SelectItem key={task.id} value={task.id}>
+                      {task.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+
+            {tasks.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada task. Buat task di Projects.</p> : null}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              {!runningEntryId ? (
+                <Button onClick={handleStart} disabled={!selectedTaskId}>Start Timer</Button>
+              ) : (
+                <>
+                  <div className="rounded-lg border border-border bg-muted/40 px-4 py-2 font-mono text-lg">{formatDuration(elapsed)}</div>
+                  <Button variant="outline" onClick={handleStop}>Stop Timer</Button>
+                  {runningTask ? <p className="text-sm text-muted-foreground">Task aktif: {runningTask.title}</p> : null}
+                </>
+              )}
+            </div>
+          </FormSection>
+
+          {entries.length === 0 ? (
+            <PageEmptyState title="Belum ada time entry" description="Riwayat timer akan muncul di sini setelah Anda menjalankan tracker." />
+          ) : (
+            <Card>
+              <CardContent className="space-y-2">
+                <h2 className="font-semibold">Riwayat</h2>
+                {entries.slice(0, 20).map((entry) => {
+                  const task = tasks.find((item) => item.id === entry.task_id)
+                  return (
+                    <div key={entry.id} className="flex items-center justify-between border-b border-border py-2 text-sm last:border-b-0">
+                      <span>{task?.title ?? entry.task_id}</span>
+                      <span className="font-mono text-muted-foreground">{formatDuration(entry.duration ?? 0)}</span>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
           )}
-          <div className="flex items-center gap-4">
-            {!runningEntryId ? (
-              <Button onClick={handleStart} disabled={!selectedTaskId}>
-                Start Timer
-              </Button>
-            ) : (
-              <>
-                <span className="font-mono text-lg">
-                  {formatDuration(elapsed)}
-                </span>
-                <Button variant="secondary" onClick={handleStop}>
-                  Stop Timer
-                </Button>
-                {runningTask && (
-                  <span className="text-sm text-gray-500">Task: {runningTask.title}</span>
-                )}
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <h2 className="text-lg font-semibold mb-2">Riwayat</h2>
-      {entries.length === 0 ? (
-        <p className="text-gray-500 text-sm">Belum ada time entry.</p>
-      ) : (
-        <ul className="space-y-2">
-          {entries.slice(0, 20).map((e) => {
-            const task = tasks.find((t) => t.id === e.task_id)
-            const dur = e.duration ?? 0
-            return (
-              <li key={e.id} className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-sm">{task?.title ?? e.task_id}</span>
-                <span className="text-sm text-gray-500 font-mono">{formatDuration(dur)}</span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </div>
+        </>
+      ) : null}
+    </PageShell>
   )
 }

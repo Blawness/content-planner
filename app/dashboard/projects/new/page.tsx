@@ -1,11 +1,17 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+
 import { useAuth } from '@/components/providers/AuthProvider'
-import { createProject } from '@/lib/api/projects'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { FormActions, FormField, FormSection } from '@/components/ui/form-layout'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PageHeader, PageShell } from '@/components/ui/page-shell'
+import { createProject } from '@/lib/api/projects'
 
 export default function NewProjectPage() {
   const [name, setName] = useState('')
@@ -32,55 +38,44 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div className="p-6 max-w-lg">
-      <div className="mb-4">
-        <Link href="/dashboard/projects" className="text-sm text-gray-600 hover:underline">
-          ← Kembali ke Projects
-        </Link>
-      </div>
-      <h1 className="text-2xl font-bold mb-4">Buat Proyek Baru</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 p-2 rounded" role="alert">
-            {error}
-          </p>
-        )}
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-            Nama Proyek
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-            Deskripsi (opsional)
-          </label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Membuat...' : 'Buat Proyek'}
-          </Button>
-          <Link href="/dashboard/projects">
-            <Button type="button" variant="secondary">
-              Batal
+    <PageShell className="max-w-3xl">
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Projects', href: '/dashboard/projects' },
+          { label: 'Buat Proyek' },
+        ]}
+        eyebrow="Superuser Lab"
+        title="Buat Proyek Baru"
+        description="Gunakan proyek untuk kebutuhan koordinasi internal yang belum menjadi bagian dari flow utama Content Plan."
+      />
+
+      <form onSubmit={handleSubmit}>
+        <FormSection title="Informasi proyek" description="Nama dan deskripsi proyek akan membantu saat task produksi mulai bertambah.">
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <FormField label="Nama proyek" htmlFor="name" required>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="h-10" />
+          </FormField>
+
+          <FormField label="Deskripsi" htmlFor="description" description="Opsional, tetapi disarankan untuk memberi konteks singkat.">
+            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
+          </FormField>
+
+          <FormActions>
+            <Link href="/dashboard/projects">
+              <Button type="button" variant="outline">Batal</Button>
+            </Link>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Membuat...' : 'Buat Proyek'}
             </Button>
-          </Link>
-        </div>
+          </FormActions>
+        </FormSection>
       </form>
-    </div>
+    </PageShell>
   )
 }

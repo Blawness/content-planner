@@ -17,13 +17,13 @@ import {
   ChevronDown
 } from 'lucide-react'
 
-const nav = [
+const coreNav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/schedule', label: 'AI Content Plan', icon: Clock },
-  { href: '/dashboard/chat', label: 'AI Chat', icon: MessageSquare },
+  { href: '/dashboard/schedule', label: 'Content Plan', icon: Clock },
 ]
 
 const workInProgressNav = [
+  { href: '/dashboard/chat', label: 'AI Chat', icon: MessageSquare },
   { href: '/dashboard/projects', label: 'Projects', icon: FolderKanban },
   { href: '/dashboard/ideas', label: 'AI Ideas', icon: Lightbulb },
   { href: '/dashboard/calendar', label: 'Content Calendar', icon: Calendar },
@@ -41,6 +41,7 @@ export function DashboardSidebar() {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const [wipOpen, setWipOpen] = useState(false)
+  const showWip = Boolean(user?.isSuperuser)
 
   const isWipActive = workInProgressNav.some(item => pathname === item.href || pathname.startsWith(item.href))
 
@@ -49,7 +50,7 @@ export function DashboardSidebar() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-gray-100 border border-gray-200"
+        className="fixed left-4 top-4 z-50 rounded-lg border border-border bg-background p-2 text-foreground shadow-sm lg:hidden"
         aria-label="Toggle menu"
       >
         <span className="sr-only">Menu</span>
@@ -62,25 +63,29 @@ export function DashboardSidebar() {
         </svg>
       </button>
       <aside
-        className={`w-56 min-h-screen border-r border-gray-200 bg-gray-50 flex flex-col fixed lg:static inset-y-0 left-0 z-40 transform transition-transform lg:transform-none ${
+        className={`fixed inset-y-0 left-0 z-40 flex min-h-screen w-64 flex-col border-r border-border bg-muted/30 backdrop-blur transition-transform lg:static lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-      <div className="p-4 border-b border-gray-200">
-        <Link href="/dashboard" className="font-semibold text-gray-900">
-          AI Content Planner
-        </Link>
-      </div>
-      <nav className="flex-1 p-2 space-y-0.5">
-        {nav.map(({ href, label, icon: Icon }) => {
+        <div className="border-b border-border px-4 py-4">
+          <Link href="/dashboard" className="font-semibold tracking-tight text-foreground">
+            AI Content Planner
+          </Link>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">Workflow utama difokuskan ke Content Plan.</p>
+        </div>
+        <nav className="flex-1 space-y-5 overflow-y-auto p-3">
+          <div className="space-y-1">
+            <p className="px-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workspace</p>
+            {coreNav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
-              className={`group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
+              className={`group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                active ? 'bg-foreground text-background shadow-sm' : 'text-foreground/80 hover:bg-background hover:text-foreground'
               }`}
+              onClick={() => setOpen(false)}
             >
               <Icon 
                 className={`mr-3 w-5 h-5 transition-transform duration-300 ${
@@ -90,64 +95,68 @@ export function DashboardSidebar() {
               {label}
             </Link>
           )
-        })}
+            })}
+          </div>
 
-        {/* Work In Progress Dropdown */}
-        <div className="pt-2 mt-2 border-t border-gray-200">
-          <button
-            onClick={() => setWipOpen(!wipOpen)}
-            className={`w-full group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-              isWipActive ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <ChevronDown
-              className={`mr-3 w-5 h-5 transition-transform duration-300 ${
-                wipOpen ? 'rotate-180' : ''
-              } ${
-                isWipActive ? 'scale-110' : 'group-hover:scale-110'
-              }`}
-            />
-            <span>Work In Progress</span>
-          </button>
+          {showWip && (
+            <div className="space-y-1 border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => setWipOpen(!wipOpen)}
+                className={`group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                  isWipActive ? 'bg-background text-foreground shadow-sm' : 'text-foreground/80 hover:bg-background hover:text-foreground'
+                }`}
+              >
+                <ChevronDown
+                  className={`mr-3 h-5 w-5 transition-transform duration-300 ${
+                    wipOpen ? 'rotate-180' : ''
+                  } ${
+                    isWipActive ? 'scale-110' : 'group-hover:scale-110'
+                  }`}
+                />
+                <span>Lab Superuser</span>
+              </button>
 
-          {wipOpen && (
-            <div className="mt-1 ml-2 space-y-0.5 border-l-2 border-gray-200 pl-3">
-              {workInProgressNav.map(({ href, label, icon: Icon }) => {
-                const active = pathname === href || pathname.startsWith(href)
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      active ? 'bg-blue-100 text-blue-900' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon
-                      className={`mr-3 w-5 h-5 transition-transform duration-300 ${
-                        active ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'
-                      }`}
-                    />
-                    {label}
-                  </Link>
-                )
-              })}
+              {wipOpen && (
+                <div className="ml-3 space-y-1 border-l border-border pl-3">
+                  {workInProgressNav.map(({ href, label, icon: Icon }) => {
+                    const active = pathname === href || pathname.startsWith(href)
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        className={`group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                          active ? 'bg-background text-foreground shadow-sm' : 'text-foreground/70 hover:bg-background hover:text-foreground'
+                        }`}
+                        onClick={() => setOpen(false)}
+                      >
+                        <Icon
+                          className={`mr-3 h-5 w-5 transition-transform duration-300 ${
+                            active ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'
+                          }`}
+                        />
+                        {label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* Superuser-only admin section */}
-        {user?.isSuperuser && (
-          <div className="pt-2 mt-2 border-t border-gray-200">
-            <p className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</p>
+          {user?.isSuperuser && (
+            <div className="space-y-1 border-t border-border pt-4">
+              <p className="px-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Admin</p>
             {adminNav.map(({ href, label, icon: Icon }) => {
               const active = pathname === href || pathname.startsWith(href)
               return (
                 <Link
                   key={href}
                   href={href}
-                  className={`group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    active ? 'bg-red-600 text-white' : 'text-red-600 hover:bg-red-50'
+                  className={`group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                    active ? 'bg-destructive text-destructive-foreground' : 'text-destructive hover:bg-destructive/10'
                   }`}
+                  onClick={() => setOpen(false)}
                 >
                   <Icon 
                     className={`mr-3 w-5 h-5 transition-transform duration-300 ${
@@ -158,20 +167,20 @@ export function DashboardSidebar() {
                 </Link>
               )
             })}
-          </div>
-        )}
-      </nav>
-      <div className="p-2 border-t border-gray-200">
-        {user && (
-          <div className="px-3 py-1">
-            <p className="text-xs text-gray-500 truncate" title={user.email}>{user.email}</p>
-            {user.isSuperuser && (
-              <span className="inline-block mt-0.5 text-xs font-medium text-red-600 bg-red-50 rounded px-1.5 py-0.5">
-                Superuser
-              </span>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </nav>
+        <div className="border-t border-border p-3">
+          {user && (
+            <div className="rounded-lg bg-background px-3 py-2">
+              <p className="truncate text-xs text-muted-foreground" title={user.email}>{user.email}</p>
+              {user.isSuperuser ? (
+                <span className="mt-1 inline-block rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                  Superuser
+                </span>
+              ) : null}
+            </div>
+          )}
         <button
           type="button"
           onClick={() => {
@@ -179,20 +188,20 @@ export function DashboardSidebar() {
             router.push('/login')
             router.refresh()
           }}
-          className="w-full mt-1 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-200 rounded-lg"
+          className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm text-foreground/80 transition-colors hover:bg-background hover:text-foreground"
         >
           Logout
         </button>
-      </div>
-    </aside>
-    {open && (
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="lg:hidden fixed inset-0 z-30 bg-black/20"
-        aria-label="Close menu"
-      />
-    )}
+        </div>
+      </aside>
+      {open && (
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-30 bg-black/20 lg:hidden"
+          aria-label="Close menu"
+        />
+      )}
     </>
   )
 }

@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertTriangle } from 'lucide-react'
+import { PageShell } from '@/components/ui/page-shell'
 
 export default function DashboardError({
   error,
@@ -17,7 +18,7 @@ export default function DashboardError({
   }, [error])
 
   return (
-    <div className="p-6 flex flex-col items-center justify-center min-h-[200px] gap-4">
+    <PageShell className="flex min-h-[200px] flex-col items-center justify-center gap-4">
       <Alert variant="destructive" className="max-w-sm">
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Terjadi kesalahan</AlertTitle>
@@ -26,6 +27,6 @@ export default function DashboardError({
       <Button onClick={reset} variant="outline">
         Coba lagi
       </Button>
-    </div>
+    </PageShell>
   )
 }

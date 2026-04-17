@@ -2,11 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/components/providers/AuthProvider'
-import { generateContent } from '@/lib/api/ai'
+import { Sparkles } from 'lucide-react'
+
 import type { ContentIdea } from '@/types'
-import { Card, CardContent } from '@/components/ui/Card'
+import { useAuth } from '@/components/providers/AuthProvider'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { FormActions, FormField, FormGrid, FormSection } from '@/components/ui/form-layout'
+import { Input } from '@/components/ui/input'
+import { PageHeader, PageShell } from '@/components/ui/page-shell'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { generateContent } from '@/lib/api/ai'
 
 const PLATFORMS = ['Instagram', 'TikTok', 'LinkedIn']
 
@@ -29,7 +36,7 @@ export default function IdeasPage() {
         JSON.stringify({ niche, platform, goal, targetAudience })
       )
     }
-    router.push('/dashboard/schedule')
+    router.push('/dashboard/schedule?compose=ai')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,135 +59,94 @@ export default function IdeasPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl">
-      <h1 className="text-2xl font-bold mb-4">AI Content Idea Generator</h1>
-      <p className="text-gray-600 mb-6">
-        Masukkan niche, platform, goal, dan target audience untuk mendapatkan ide konten.
-      </p>
+    <PageShell>
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'AI Ideas' },
+        ]}
+        eyebrow="Superuser Lab"
+        title="AI Content Ideas"
+        description="Generator ide ini tetap tersedia untuk eksplorasi, tetapi output utamanya diarahkan kembali ke Content Plan wizard."
+      />
 
-      <form onSubmit={handleSubmit} className="space-y-4 mb-8">
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 p-2 rounded" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="niche" className="block text-sm font-medium text-gray-700 mb-1">
-              Niche bisnis
-            </label>
-            <input
-              id="niche"
-              type="text"
-              value={niche}
-              onChange={(e) => setNiche(e.target.value)}
-              required
-              placeholder="Contoh: Skincare, F&B"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label htmlFor="platform" className="block text-sm font-medium text-gray-700 mb-1">
-              Platform
-            </label>
-            <select
-              id="platform"
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-            >
-              {PLATFORMS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div>
-          <label htmlFor="goal" className="block text-sm font-medium text-gray-700 mb-1">
-            Goal konten
-          </label>
-          <input
-            id="goal"
-            type="text"
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-            required
-            placeholder="Contoh: Brand awareness, konversi"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label htmlFor="audience" className="block text-sm font-medium text-gray-700 mb-1">
-            Target audience
-          </label>
-          <input
-            id="audience"
-            type="text"
-            value={targetAudience}
-            onChange={(e) => setTargetAudience(e.target.value)}
-            required
-            placeholder="Contoh: Wanita 25-34, urban"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label htmlFor="count" className="block text-sm font-medium text-gray-700 mb-1">
-            Jumlah ide
-          </label>
-          <input
-            id="count"
-            type="number"
-            min={1}
-            max={10}
-            value={count}
-            onChange={(e) => setCount(Number(e.target.value))}
-            className="w-full max-w-[120px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-          />
-        </div>
-        <Button type="submit" disabled={loading}>
-          {loading ? 'Generate...' : 'Generate Ide'}
-        </Button>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <FormSection title="Idea brief" description="Masukkan konteks singkat sebelum AI menyusun daftar ide awal.">
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <FormGrid>
+            <FormField label="Niche bisnis" htmlFor="niche" required>
+              <Input id="niche" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Contoh: Skincare, F&B" className="h-10" />
+            </FormField>
+            <FormField label="Platform">
+              <Select value={platform} onValueChange={(value) => setPlatform(value ?? PLATFORMS[0])}>
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PLATFORMS.map((item) => (
+                    <SelectItem key={item} value={item}>{item}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </FormGrid>
+
+          <FormField label="Goal konten" htmlFor="goal" required>
+            <Input id="goal" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Contoh: Brand awareness, konversi" className="h-10" />
+          </FormField>
+
+          <FormGrid>
+            <FormField label="Target audience" htmlFor="audience" required>
+              <Input id="audience" value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} placeholder="Contoh: wanita 25-34 di kota besar" className="h-10" />
+            </FormField>
+            <FormField label="Jumlah ide" htmlFor="count">
+              <Input id="count" type="number" min={1} max={10} value={count} onChange={(e) => setCount(Number(e.target.value))} className="h-10" />
+            </FormField>
+          </FormGrid>
+
+          <FormActions className="justify-between sm:flex-row sm:items-center">
+            <p className="text-sm text-muted-foreground">Jika hasilnya cocok, Anda bisa kirim brief ini ke AI wizard Content Plan.</p>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Generate...' : 'Generate Ide'}
+            </Button>
+          </FormActions>
+        </FormSection>
       </form>
 
-      {ideas.length > 0 && (
+      {ideas.length > 0 ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Hasil</h2>
-            <Button type="button" variant="secondary" onClick={handleUseForSchedule} className="text-sm gap-2">
-              📅 Buat Content Plan dari Ide Ini
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Hasil ide</h2>
+              <p className="text-sm text-muted-foreground">Review cepat sebelum dikirim ke Content Plan.</p>
+            </div>
+            <Button type="button" variant="outline" onClick={handleUseForSchedule}>
+              <Sparkles className="size-4" />
+              Kirim ke AI Wizard
             </Button>
           </div>
-          <ul className="space-y-4">
-            {ideas.map((idea, i) => (
-              <li key={i}>
-                <Card>
-                  <CardContent className="pt-4 space-y-2">
-                    <p className="font-semibold text-gray-900">{idea.title}</p>
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Hook:</span> {idea.hook}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Format:</span> {idea.format}
-                    </p>
-                    {idea.caption_draft && (
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Caption draft:</span> {idea.caption_draft}
-                      </p>
-                    )}
-                    {idea.cta && (
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">CTA:</span> {idea.cta}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </li>
+          <div className="grid gap-4">
+            {ideas.map((idea, index) => (
+              <Card key={`${idea.title}-${index}`}>
+                <CardHeader>
+                  <CardTitle className="text-base">{idea.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Hook:</span> {idea.hook}</p>
+                  <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Format:</span> {idea.format}</p>
+                  {idea.caption_draft ? <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Caption draft:</span> {idea.caption_draft}</p> : null}
+                  {idea.cta ? <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">CTA:</span> {idea.cta}</p> : null}
+                </CardContent>
+              </Card>
             ))}
-          </ul>
+          </div>
         </div>
-      )}
-    </div>
+      ) : null}
+    </PageShell>
   )
 }

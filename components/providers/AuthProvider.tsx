@@ -11,10 +11,8 @@ export type User = {
 type AuthContextType = {
   user: User | null
   token: string | null
-  isGuest: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string) => Promise<void>
-  enterAsGuest: () => void
   logout: () => void
   isLoading: boolean
 }
@@ -23,25 +21,15 @@ const AuthContext = createContext<AuthContextType | null>(null)
 
 const TOKEN_KEY = 'content_planner_token'
 const USER_KEY = 'content_planner_user'
-const GUEST_COOKIE = 'content_planner_guest'
-const GUEST_USER: User = { id: 'guest', email: 'Tamu', isSuperuser: false }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
-  const [isGuest, setIsGuest] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const init = () => {
       if (typeof window === 'undefined') return
-      const guestCookie = document.cookie.includes(`${GUEST_COOKIE}=1`)
-      if (guestCookie) {
-        setUser(GUEST_USER)
-        setIsGuest(true)
-        setIsLoading(false)
-        return
-      }
       const storedToken = sessionStorage.getItem(TOKEN_KEY)
       const storedUser = sessionStorage.getItem(USER_KEY)
       if (storedToken && storedUser) {
@@ -108,28 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const enterAsGuest = useCallback(() => {
-    setToken(null)
-    setUser(GUEST_USER)
-    setIsGuest(true)
-    sessionStorage.removeItem(TOKEN_KEY)
-    sessionStorage.removeItem(USER_KEY)
-    document.cookie = 'content_planner_token=; path=/; max-age=0'
-    document.cookie = `${GUEST_COOKIE}=1; path=/; max-age=86400; SameSite=Lax`
-  }, [])
-
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
-    setIsGuest(false)
     sessionStorage.removeItem(TOKEN_KEY)
     sessionStorage.removeItem(USER_KEY)
     document.cookie = 'content_planner_token=; path=/; max-age=0'
-    document.cookie = `${GUEST_COOKIE}=; path=/; max-age=0`
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, token, isGuest, login, register, enterAsGuest, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   )

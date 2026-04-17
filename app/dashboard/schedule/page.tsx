@@ -1,27 +1,80 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import { format, isValid, parse } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { useAuth } from '@/components/providers/AuthProvider'
-import { useGenerateScheduleStream } from '@/hooks/useGenerateScheduleStream'
-import {
-  fetchContentPlan,
-  createContentPlanItem,
-  updateContentPlanItem,
-  deleteContentPlanItem,
-  deleteAllContentPlan,
-  batchCreateContentPlan,
-} from '@/lib/api/content-plan'
+import { CalendarClock, ChevronDown, PencilLine, Sparkles, WandSparkles } from 'lucide-react'
+
 import type { ContentPlanRow } from '@/types'
-import { Card, CardContent } from '@/components/ui/Card'
+import { useAuth } from '@/components/providers/AuthProvider'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ChevronDown } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { FormField, FormGrid, FormSection } from '@/components/ui/form-layout'
+import { Input } from '@/components/ui/input'
+import { PageEmptyState, PageErrorState, PageHeader, PageLoadingState, PageShell } from '@/components/ui/page-shell'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { fetchContentPlan, createContentPlanItem, updateContentPlanItem, deleteContentPlanItem, deleteAllContentPlan, batchCreateContentPlan } from '@/lib/api/content-plan'
+import { useGenerateScheduleStream } from '@/hooks/useGenerateScheduleStream'
+import { cn } from '@/lib/utils'
 import 'react-datepicker/dist/react-datepicker.css'
 
 const PLATFORMS = ['Instagram', 'TikTok', 'LinkedIn']
 const TONES = ['Edukatif', 'Promosi', 'Entertaining', 'Inspiratif', 'Story Telling']
+const FORMAT_OPTIONS = ['Single Post', 'Carousel', 'Reels']
+const STATUS_OPTIONS = ['To Do', 'In Review', 'Done']
+const WIZARD_STEPS = ['Preset', 'Konfigurasi', 'Preview']
+
+const AI_PRESETS = [
+  {
+    id: 'awareness',
+    label: 'Awareness',
+    summary: 'Edukasi ringan untuk menaikkan reach dan membangun trust awal.',
+    defaults: {
+      tone: 'Edukatif',
+      contentIdea: 'Bangun awareness dengan edukasi sederhana dan topik yang mudah dibagikan.',
+      contentPerWeek: 3,
+      durationWeeks: 2,
+    },
+    examples: ['Mitos vs fakta', 'Kesalahan paling umum', 'FAQ singkat untuk pemula'],
+  },
+  {
+    id: 'engagement',
+    label: 'Engagement',
+    summary: 'Mendorong komentar, save, dan interaksi komunitas.',
+    defaults: {
+      tone: 'Entertaining',
+      contentIdea: 'Aktifkan interaksi lewat opini, checklist, dan format yang mengundang respons.',
+      contentPerWeek: 4,
+      durationWeeks: 2,
+    },
+    examples: ['A atau B', 'Checklist mingguan', 'Cerita relatable dari audiens'],
+  },
+  {
+    id: 'launch',
+    label: 'Product Launch',
+    summary: 'Menyiapkan rangkaian konten teaser, value, dan CTA menjelang promo.',
+    defaults: {
+      tone: 'Promosi',
+      contentIdea: 'Bangun minat menuju peluncuran produk dengan teaser, demo, dan CTA yang jelas.',
+      contentPerWeek: 5,
+      durationWeeks: 3,
+    },
+    examples: ['Teaser fitur utama', 'Before-after', 'Social proof dan CTA'],
+  },
+]
 
 const EMPTY_ROW: ContentPlanRow = {
   week_label: '',
@@ -40,14 +93,9 @@ const EMPTY_ROW: ContentPlanRow = {
 
 function getStatusCellClass(status: string) {
   const normalized = status.toLowerCase()
-  if (normalized.includes('existing')) return 'bg-blue-100 text-blue-800 border-blue-200'
-  if (normalized.includes('done')) return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-  return 'bg-amber-100 text-amber-800 border-amber-200'
-}
-
-function toTitleCase(value: string) {
-  if (!value) return value
-  return value.charAt(0).toUpperCase() + value.slice(1)
+  if (normalized.includes('done')) return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
+  if (normalized.includes('review')) return 'bg-blue-500/10 text-blue-700 border-blue-500/20'
+  return 'bg-amber-500/10 text-amber-700 border-amber-500/20'
 }
 
 function parseUiDate(value: string) {
@@ -60,55 +108,147 @@ function formatUiDate(date: Date) {
 }
 
 function getUiDay(date: Date) {
-  return toTitleCase(format(date, 'EEEE', { locale: localeId }))
+  const label = format(date, 'EEEE', { locale: localeId })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function sortRows(rows: ContentPlanRow[]) {
+  return [...rows].sort((a, b) => {
+    const dateA = parseUiDate(a.date)
+    const dateB = parseUiDate(b.date)
+    if (!dateA || !dateB) return a.week_label.localeCompare(b.week_label)
+    return dateA.getTime() - dateB.getTime()
+  })
 }
 
 export default function SchedulePage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { token, isLoading: authLoading } = useAuth()
+  const { generateScheduleStream } = useGenerateScheduleStream()
+
   const [rows, setRows] = useState<ContentPlanRow[]>([])
   const [loadingItems, setLoadingItems] = useState(true)
-  const [formRow, setFormRow] = useState<ContentPlanRow>(EMPTY_ROW)
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
+  const [pageError, setPageError] = useState('')
 
   const [showCrudModal, setShowCrudModal] = useState(false)
   const [showAiModal, setShowAiModal] = useState(false)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [formRow, setFormRow] = useState<ContentPlanRow>(EMPTY_ROW)
+  const [formError, setFormError] = useState('')
+  const [savingRow, setSavingRow] = useState(false)
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
-  // AI form state
-  // Default AI generator: 1 konten per minggu
-  const [contentPerWeek, setContentPerWeek] = useState(1)
+  const [wizardStep, setWizardStep] = useState(0)
+  const [selectedPresetId, setSelectedPresetId] = useState(AI_PRESETS[0].id)
+  const [contentPerWeek, setContentPerWeek] = useState(AI_PRESETS[0].defaults.contentPerWeek)
   const [platform, setPlatform] = useState(PLATFORMS[0])
   const [niche, setNiche] = useState('')
-  const [contentIdea, setContentIdea] = useState('')
+  const [contentIdea, setContentIdea] = useState(AI_PRESETS[0].defaults.contentIdea)
   const [monthLabel, setMonthLabel] = useState('')
-  // Default AI generator: durasi 1 minggu
-  const [durationWeeks, setDurationWeeks] = useState(1)
+  const [durationWeeks, setDurationWeeks] = useState(AI_PRESETS[0].defaults.durationWeeks)
   const [startDate, setStartDate] = useState<Date | null>(null)
-  const [tone, setTone] = useState(TONES[0])
+  const [tone, setTone] = useState(AI_PRESETS[0].defaults.tone)
   const [aiTargetAudience, setAiTargetAudience] = useState('')
   const [replaceExisting, setReplaceExisting] = useState(false)
-
-  const [loading, setLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [previewRows, setPreviewRows] = useState<ContentPlanRow[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [savingPreview, setSavingPreview] = useState(false)
   const [streamProgress, setStreamProgress] = useState({ current: 0, total: 0 })
   const [streamMessage, setStreamMessage] = useState('')
+  const isUnauthorized = !authLoading && !token
 
   const pendingItemsRef = useRef<ContentPlanRow[]>([])
 
-  const { token } = useAuth()
-  const { generateScheduleStream } = useGenerateScheduleStream()
+  const selectedPreset = useMemo(
+    () => AI_PRESETS.find((preset) => preset.id === selectedPresetId) ?? AI_PRESETS[0],
+    [selectedPresetId]
+  )
 
-  // Load items from DB on mount
+  const weekKeys = useMemo(
+    () => Array.from(new Set(sortRows(rows).map((row) => row.week_label).filter(Boolean))),
+    [rows]
+  )
+
+  const previewWeekKeys = useMemo(
+    () => Array.from(new Set(sortRows(previewRows).map((row) => row.week_label).filter(Boolean))),
+    [previewRows]
+  )
+
+  const estimatedCount = contentPerWeek * durationWeeks
+
+  const setWizardDefaultsFromPreset = useCallback((presetId: string) => {
+    const preset = AI_PRESETS.find((item) => item.id === presetId)
+    if (!preset) return
+    setSelectedPresetId(preset.id)
+    setTone(preset.defaults.tone)
+    setContentIdea(preset.defaults.contentIdea)
+    setContentPerWeek(preset.defaults.contentPerWeek)
+    setDurationWeeks(preset.defaults.durationWeeks)
+  }, [])
+
+  const resetWizardState = useCallback(() => {
+    setWizardStep(0)
+    setWizardDefaultsFromPreset(AI_PRESETS[0].id)
+    setPlatform(PLATFORMS[0])
+    setNiche('')
+    setAiTargetAudience('')
+    setMonthLabel('')
+    setStartDate(null)
+    setReplaceExisting(false)
+    setAiError('')
+    setPreviewRows([])
+    setPreviewLoading(false)
+    setSavingPreview(false)
+    setStreamProgress({ current: 0, total: 0 })
+    setStreamMessage('')
+    pendingItemsRef.current = []
+  }, [setWizardDefaultsFromPreset])
+
+  const openAiWizard = useCallback(() => {
+    resetWizardState()
+    setShowAiModal(true)
+  }, [resetWizardState])
+
+  const closeAiWizard = useCallback(() => {
+    setShowAiModal(false)
+    setAiError('')
+    setPreviewRows([])
+    setPreviewLoading(false)
+    setSavingPreview(false)
+    setStreamProgress({ current: 0, total: 0 })
+    setStreamMessage('')
+  }, [])
+
+  const openCreateModal = useCallback(() => {
+    setEditingIndex(null)
+    setFormRow(EMPTY_ROW)
+    setFormError('')
+    setShowCrudModal(true)
+  }, [])
+
   useEffect(() => {
     if (!token) return
+
     fetchContentPlan(token)
-      .then((items) => setRows(items))
-      .catch(console.error)
+      .then((items) => setRows(sortRows(items)))
+      .catch((err) => setPageError(err instanceof Error ? err.message : 'Gagal memuat content plan'))
       .finally(() => setLoadingItems(false))
   }, [token])
 
-  // Check localStorage for idea prefill (from ideas page)
+  useEffect(() => {
+    const compose = searchParams.get('compose')
+    if (compose === 'manual') {
+      openCreateModal()
+      router.replace('/dashboard/schedule', { scroll: false })
+    }
+    if (compose === 'ai') {
+      openAiWizard()
+      router.replace('/dashboard/schedule', { scroll: false })
+    }
+  }, [openAiWizard, openCreateModal, router, searchParams])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const raw = localStorage.getItem('content_planner_schedule_prefill')
@@ -119,20 +259,15 @@ export default function SchedulePage() {
       if (data.platform) setPlatform(data.platform)
       if (data.goal) setContentIdea(data.goal)
       if (data.targetAudience) setAiTargetAudience(data.targetAudience)
-      setShowAiModal(true)
-    } catch {}
+      openAiWizard()
+    } catch {
+      // Ignore invalid local storage payload.
+    }
     localStorage.removeItem('content_planner_schedule_prefill')
-  }, [])
+  }, [openAiWizard])
 
   function handleFormRowChange<K extends keyof ContentPlanRow>(key: K, value: ContentPlanRow[K]) {
     setFormRow((prev) => ({ ...prev, [key]: value }))
-  }
-
-  function openCreateModal() {
-    setEditingIndex(null)
-    setFormRow(EMPTY_ROW)
-    setFormError('')
-    setShowCrudModal(true)
   }
 
   function handleEdit(index: number) {
@@ -159,42 +294,48 @@ export default function SchedulePage() {
     }
 
     if (!token) return
-    setSaving(true)
+    setSavingRow(true)
     try {
       if (editingIndex === null) {
         const saved = await createContentPlanItem(formRow, token)
-        setRows((prev) => [...prev, saved])
+        setRows((prev) => sortRows([...prev, saved]))
       } else {
         const item = rows[editingIndex]
         if (item.id) {
           const saved = await updateContentPlanItem(item.id, formRow, token)
-          setRows((prev) => prev.map((r, i) => (i === editingIndex ? saved : r)))
-        } else {
-          setRows((prev) => prev.map((r, i) => (i === editingIndex ? { ...formRow } : r)))
+          setRows((prev) => sortRows(prev.map((row, index) => (index === editingIndex ? saved : row))))
         }
       }
       handleCancelCrudModal()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Gagal menyimpan')
+      setFormError(err instanceof Error ? err.message : 'Gagal menyimpan item')
     } finally {
-      setSaving(false)
+      setSavingRow(false)
     }
   }
 
   async function handleDelete(index: number) {
     const item = rows[index]
-    if (item.id && token) {
-      deleteContentPlanItem(item.id, token).catch(console.error)
+    const confirmed = window.confirm(`Hapus item "${item.headline}" dari content plan?`)
+    if (!confirmed) return
+
+    try {
+      if (item.id && token) {
+        await deleteContentPlanItem(item.id, token)
+      }
+      setRows((prev) => prev.filter((_, itemIndex) => itemIndex !== index))
+      if (expandedIndex === index) setExpandedIndex(null)
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : 'Gagal menghapus item')
     }
-    setRows((prev) => prev.filter((_, i) => i !== index))
-    if (expandedIndex === index) setExpandedIndex(null)
   }
 
-  async function handleGenerateAi(e: React.FormEvent) {
-    e.preventDefault()
+  async function handlePreviewGenerate() {
     if (!token) return
     setAiError('')
-    setLoading(true)
+    setPreviewRows([])
+    setPreviewLoading(true)
+    setWizardStep(2)
     setStreamProgress({ current: 0, total: 0 })
     setStreamMessage('')
     pendingItemsRef.current = []
@@ -215,270 +356,233 @@ export default function SchedulePage() {
         token,
         {
           onStart: (total) => {
-            if (replaceExisting) setRows([])
-            pendingItemsRef.current = []
             setStreamProgress({ current: 0, total })
-            setStreamMessage(`Memulai... ${total} konten akan digenerate`)
+            setStreamMessage(`Menyiapkan preview ${total} konten`)
           },
-          onProgress: (message) => {
-            setStreamMessage(`${message}`)
+          onProgress: (message, generated, total) => {
+            setStreamMessage(message)
+            setStreamProgress({ current: generated, total })
           },
           onItem: (item, count, total) => {
             pendingItemsRef.current.push(item)
-            setRows((prev) => [...prev, item])
+            setPreviewRows((prev) => sortRows([...prev, item]))
             setStreamProgress({ current: count, total })
-            setStreamMessage(`Konten ${count}/${total} selesai`)
+            setStreamMessage(`Preview ${count}/${total} siap direview`)
           },
           onComplete: (total, message) => {
+            setPreviewRows(sortRows([...pendingItemsRef.current]))
             setStreamProgress({ current: total, total })
             setStreamMessage(message)
-            const pending = [...pendingItemsRef.current]
-            ;(async () => {
-              try {
-                if (replaceExisting) await deleteAllContentPlan(token)
-                const saved = await batchCreateContentPlan(pending, token)
-                if (replaceExisting) {
-                  setRows(saved)
-                } else {
-                  setRows((prev) => {
-                    const withIds = prev.filter((r) => r.id)
-                    return [...withIds, ...saved]
-                  })
-                }
-                setStreamMessage(`Tersimpan! ${saved.length} konten berhasil disimpan ke database.`)
-              } catch (err) {
-                console.error('Failed to save to DB:', err)
-                setAiError(
-                  `Konten berhasil digenerate tapi gagal disimpan ke database: ${err instanceof Error ? err.message : 'Unknown error'}. Coba refresh halaman.`
-                )
-              } finally {
-                setLoading(false)
-                setTimeout(() => setShowAiModal(false), 1500)
-              }
-            })()
+            setPreviewLoading(false)
           },
           onError: (message) => {
             setAiError(message)
-            setLoading(false)
+            setPreviewLoading(false)
           },
         }
       )
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Gagal generate jadwal'
-      setAiError(errorMsg)
-      setLoading(false)
+      setAiError(err instanceof Error ? err.message : 'Gagal membuat preview AI')
+      setPreviewLoading(false)
     }
   }
 
-  const weekKeys = Array.from(new Set(rows.map((row) => row.week_label).filter(Boolean)))
+  async function handleSavePreview() {
+    if (!token || previewRows.length === 0) return
+    setSavingPreview(true)
+    setAiError('')
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-4 md:p-6 lg:p-8 max-w-5xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Content Plan</h1>
-          <p className="text-gray-600 text-sm md:text-base max-w-2xl">
-            Kelola jadwal konten Anda dengan mudah. Tambah secara manual atau gunakan AI generator.
-          </p>
-        </div>
+    try {
+      if (replaceExisting) {
+        await deleteAllContentPlan(token)
+      }
+      const saved = await batchCreateContentPlan(previewRows, token)
+      setRows((prev) => sortRows(replaceExisting ? saved : [...prev, ...saved]))
+      setStreamMessage(`Tersimpan. ${saved.length} item masuk ke Content Plan.`)
+      setTimeout(() => closeAiWizard(), 700)
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Gagal menyimpan preview ke database')
+    } finally {
+      setSavingPreview(false)
+    }
+  }
 
-        <div className="mb-8 flex flex-col sm:flex-row gap-3">
-          <Button type="button" onClick={openCreateModal} className="gap-2 px-6 py-3 text-base font-semibold sm:w-auto">
-            ➕ Tambah Baris Manual
-          </Button>
-          <Button type="button" onClick={() => setShowAiModal(true)} variant="secondary" className="gap-2 px-6 py-3 text-base font-semibold sm:w-auto">
-            ✨ Buka AI Generator
-          </Button>
-        </div>
+  function renderRows(groupRows: ContentPlanRow[]) {
+    return groupRows.map((row, idx) => {
+      const globalIndex = rows.indexOf(row)
+      const isExpanded = expandedIndex === globalIndex
 
-        <div className="space-y-6">
-          {loadingItems ? (
-            <Card className="rounded-2xl">
-              <CardContent className="py-12 text-center text-gray-500 text-sm">
-                Memuat konten plan...
-              </CardContent>
-            </Card>
-          ) : weekKeys.length > 0 ? (
-            weekKeys.map((weekLabel) => {
-              const weekRows = rows.filter((row) => row.week_label === weekLabel)
-              return (
-                <Card key={weekLabel} className="overflow-hidden rounded-2xl">
-                  <CardContent className="p-0">
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 md:px-6 py-4 border-b border-gray-200">
-                      <h2 className="text-lg font-semibold text-gray-900">{weekLabel}</h2>
-                      <p className="text-sm text-gray-600 mt-1">{weekRows.length} konten</p>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                      {weekRows.map((row, idx) => {
-                        const globalIndex = rows.indexOf(row)
-                        const isExpanded = expandedIndex === globalIndex
-                        return (
-                          <div key={`${row.id ?? row.date}-${idx}`} className="hover:bg-gray-50 transition-colors">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedIndex(isExpanded ? null : globalIndex)}
-                              className="w-full px-4 md:px-6 py-4 text-left"
-                            >
-                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[5rem_minmax(0,1fr)_auto_minmax(0,2fr)_auto] gap-2 md:gap-4 items-center">
-                                <div className="col-span-1">
-                                  <p className="text-sm font-medium text-gray-900">{row.date}</p>
-                                  <p className="text-xs text-gray-500">{row.day}</p>
-                                </div>
-                                <div className="col-span-1 hidden md:block">
-                                  <p className="text-sm text-gray-700 truncate">{row.topic}</p>
-                                </div>
-                                <div className="col-span-1 hidden lg:block">
-                                  <span className="inline-block px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
-                                    {row.format}
-                                  </span>
-                                </div>
-                                <div className="col-span-1 md:col-span-2 lg:col-span-1">
-                                  <p className="text-sm font-medium text-gray-900 truncate">{row.headline}</p>
-                                </div>
-                                <div className="col-span-1 flex items-center justify-between gap-2">
-                                  <span
-                                    className={`inline-block px-2.5 py-1 text-xs font-medium rounded-full border ${getStatusCellClass(row.status)}`}
-                                  >
-                                    {row.status}
-                                  </span>
-                                  <ChevronDown
-                                    className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                  />
-                                </div>
-                              </div>
-                            </button>
-
-                            {isExpanded && (
-                              <div className="px-4 md:px-6 py-4 bg-gray-50 border-t border-gray-200">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                  <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Tema / Topik</p>
-                                    <p className="text-sm text-gray-900">{row.topic}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Format</p>
-                                    <p className="text-sm text-gray-900">{row.format}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Waktu Publish</p>
-                                    <p className="text-sm text-gray-900">{row.scheduled_time}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Keterangan</p>
-                                    <p className="text-sm text-gray-900">{row.notes}</p>
-                                  </div>
-                                </div>
-
-                                {row.visual_description && (
-                                  <div className="mb-3">
-                                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Deskripsi Visual</p>
-                                    <p className="text-sm text-gray-700 leading-relaxed">{row.visual_description}</p>
-                                  </div>
-                                )}
-
-                                {row.content_body && (
-                                  <div className="mb-3">
-                                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Isi Konten</p>
-                                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{row.content_body}</p>
-                                  </div>
-                                )}
-
-                                {row.hook_caption && (
-                                  <div className="mb-4">
-                                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Hook / Caption</p>
-                                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{row.hook_caption}</p>
-                                  </div>
-                                )}
-
-                                <div className="flex gap-2 pt-4 border-t border-gray-200">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEdit(globalIndex)}
-                                    className="flex-1 px-4 py-2.5 text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                                  >
-                                    ✏️ Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDelete(globalIndex)}
-                                    className="flex-1 px-4 py-2.5 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                                  >
-                                    🗑️ Hapus
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })
-          ) : (
-            <Card className="rounded-2xl border-2 border-dashed border-gray-300">
-              <CardContent className="py-16 md:py-20 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-                  <span className="text-3xl">📋</span>
-                </div>
-                <p className="text-lg font-semibold text-gray-700 mb-2">Tabel masih kosong</p>
-                <p className="text-sm text-gray-500 mb-6">Klik tombol di atas untuk menambah konten baru</p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button type="button" onClick={openCreateModal} className="gap-2 px-4 py-2 text-sm">
-                    ➕ Tambah Manual
-                  </Button>
-                  <Button type="button" onClick={() => setShowAiModal(true)} variant="secondary" className="gap-2 px-4 py-2 text-sm">
-                    ✨ Generate AI
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {/* CRUD Modal */}
-      {showCrudModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl my-8 overflow-visible">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingIndex === null ? '➕ Tambah Baris Manual' : '✏️ Edit Baris'}
-              </h3>
-              <button
-                type="button"
-                onClick={handleCancelCrudModal}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-              >
-                ✕
-              </button>
+      return (
+        <div key={`${row.id ?? row.date}-${idx}`} className="border-t border-border first:border-t-0">
+          <button
+            type="button"
+            onClick={() => setExpandedIndex(isExpanded ? null : globalIndex)}
+            className="w-full px-4 py-4 text-left transition-colors hover:bg-muted/40 md:px-6"
+          >
+            <div className="grid gap-3 md:grid-cols-[7rem_minmax(0,1fr)_auto_minmax(0,1.4fr)_auto] md:items-center">
+              <div>
+                <p className="text-sm font-medium">{row.date}</p>
+                <p className="text-xs text-muted-foreground">{row.day}</p>
+              </div>
+              <div className="hidden md:block">
+                <p className="truncate text-sm text-muted-foreground">{row.topic}</p>
+              </div>
+              <Badge variant="outline">{row.format}</Badge>
+              <p className="truncate text-sm font-medium">{row.headline}</p>
+              <div className="flex items-center justify-between gap-2">
+                <span className={cn('inline-flex rounded-full border px-2.5 py-1 text-xs font-medium', getStatusCellClass(row.status))}>
+                  {row.status}
+                </span>
+                <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', isExpanded ? 'rotate-180' : undefined)} />
+              </div>
             </div>
-            <form onSubmit={handleRowSubmit} className="p-4 md:p-6 space-y-4">
-              {formError && (
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 p-3 rounded-lg" role="alert">
-                  {formError}
-                </div>
-              )}
+          </button>
 
+          {isExpanded ? (
+            <div className="border-t border-border bg-muted/20 px-4 py-4 md:px-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label htmlFor="weekLabel" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Label Minggu *
-                  </label>
-                  <input
-                    id="weekLabel"
-                    type="text"
-                    value={formRow.week_label}
-                    onChange={(e) => handleFormRowChange('week_label', e.target.value)}
-                    placeholder="Minggu 1 - 17-20 April 2026"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Topik</p>
+                  <p className="mt-1 text-sm">{row.topic}</p>
                 </div>
                 <div>
-                  <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Tanggal *
-                  </label>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Waktu Publish</p>
+                  <p className="mt-1 text-sm">{row.scheduled_time}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Deskripsi Visual</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{row.visual_description || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Catatan</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{row.notes || '-'}</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Isi Konten</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{row.content_body || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Hook / Caption</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{row.hook_caption || '-'}</p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                <Button type="button" variant="outline" onClick={() => handleEdit(globalIndex)}>
+                  <PencilLine className="size-4" />
+                  Edit
+                </Button>
+                <Button type="button" variant="destructive" onClick={() => handleDelete(globalIndex)}>
+                  Hapus
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )
+    })
+  }
+
+  return (
+    <PageShell>
+      <PageHeader
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Content Plan' },
+        ]}
+        eyebrow="Core Module"
+        title="Content Plan"
+        description="Satu source of truth untuk ide, AI generate, jadwal publish, dan detail setiap konten. Preview AI tidak akan tersimpan sebelum Anda konfirmasi."
+        actions={
+          <>
+            <Button type="button" variant="outline" onClick={openCreateModal}>
+              <PencilLine className="size-4" />
+              Tambah Manual
+            </Button>
+            <Button type="button" onClick={openAiWizard}>
+              <WandSparkles className="size-4" />
+              AI Wizard
+            </Button>
+          </>
+        }
+      />
+
+      {authLoading || (token && loadingItems) ? <PageLoadingState title="Memuat content plan" /> : null}
+      {!authLoading && isUnauthorized ? <PageErrorState description="Sesi login tidak ditemukan. Silakan login ulang untuk membuka Content Plan." /> : null}
+      {!authLoading && !isUnauthorized && !loadingItems && pageError ? <PageErrorState description={pageError} /> : null}
+
+      {!authLoading && !isUnauthorized && !loadingItems && !pageError && rows.length === 0 ? (
+        <PageEmptyState
+          icon={<CalendarClock className="size-6" aria-hidden="true" />}
+          title="Content Plan masih kosong"
+          description="Mulai dari AI Wizard jika Anda ingin generate draft cepat dengan preset, atau tambah manual jika struktur kontennya sudah siap."
+          action={
+            <>
+              <Button type="button" variant="outline" onClick={openCreateModal}>
+                Tambah Manual
+              </Button>
+              <Button type="button" onClick={openAiWizard}>
+                <Sparkles className="size-4" />
+                Buka AI Wizard
+              </Button>
+            </>
+          }
+        />
+      ) : null}
+
+      {!authLoading && !isUnauthorized && !loadingItems && !pageError && rows.length > 0 ? (
+        <div className="space-y-4">
+          {weekKeys.map((weekLabel) => {
+            const weekRows = rows.filter((row) => row.week_label === weekLabel)
+            return (
+              <Card key={weekLabel} className="overflow-hidden">
+                <CardHeader className="border-b border-border bg-muted/40">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <CardTitle>{weekLabel}</CardTitle>
+                      <CardDescription>{weekRows.length} item konten</CardDescription>
+                    </div>
+                    <Badge variant="secondary">{weekRows[0]?.status ?? 'Planned'}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">{renderRows(weekRows)}</CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      ) : null}
+
+      <Dialog open={showCrudModal} onOpenChange={(nextOpen) => (!nextOpen ? handleCancelCrudModal() : setShowCrudModal(true))}>
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto p-0 sm:max-w-4xl" showCloseButton={false}>
+          <div className="border-b border-border px-5 py-4">
+            <DialogHeader>
+              <DialogTitle>{editingIndex === null ? 'Tambah Item Manual' : 'Edit Item Content Plan'}</DialogTitle>
+              <DialogDescription>Gunakan form yang sama untuk menjaga struktur data content plan tetap konsisten.</DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <form onSubmit={handleRowSubmit} className="space-y-5 px-5 py-5">
+            {formError ? (
+              <Alert variant="destructive">
+                <AlertTitle>Form belum lengkap</AlertTitle>
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            <FormSection title="Informasi jadwal" description="Kolom dasar untuk mengelompokkan konten per minggu dan tanggal.">
+              <FormGrid>
+                <FormField label="Label minggu" htmlFor="weekLabel" required>
+                  <Input
+                    id="weekLabel"
+                    value={formRow.week_label}
+                    onChange={(e) => handleFormRowChange('week_label', e.target.value)}
+                    placeholder="Minggu 1 - April 2026"
+                    className="h-10"
+                  />
+                </FormField>
+
+                <FormField label="Tanggal" htmlFor="date" required>
                   <DatePicker
                     id="date"
                     selected={parseUiDate(formRow.date)}
@@ -493,385 +597,460 @@ export default function SchedulePage() {
                     }}
                     dateFormat="dd/MM/yyyy"
                     placeholderText="dd/mm/yyyy"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                     calendarClassName="text-sm"
-                    popperClassName="z-[60]"
+                    popperClassName="z-[70]"
                     popperPlacement="bottom-start"
                   />
-                </div>
-                <div>
-                  <label htmlFor="day" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Hari *
-                  </label>
-                  <input
-                    id="day"
-                    type="text"
-                    value={formRow.day}
-                    readOnly
-                    placeholder="Otomatis dari tanggal"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="format" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Format *
-                  </label>
-                  <select
-                    id="format"
-                    value={formRow.format}
-                    onChange={(e) => handleFormRowChange('format', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option>Single Post</option>
-                    <option>Carousel</option>
-                    <option>Reels</option>
-                  </select>
-                </div>
-              </div>
+                </FormField>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label htmlFor="topic" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Tema / Topik *
-                  </label>
-                  <input
-                    id="topic"
-                    type="text"
-                    value={formRow.topic}
-                    onChange={(e) => handleFormRowChange('topic', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="headline" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Headline / Judul *
-                  </label>
-                  <input
-                    id="headline"
-                    type="text"
-                    value={formRow.headline}
-                    onChange={(e) => handleFormRowChange('headline', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+                <FormField label="Hari" htmlFor="day" required>
+                  <Input id="day" value={formRow.day} readOnly placeholder="Otomatis dari tanggal" className="h-10" />
+                </FormField>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <label htmlFor="scheduledTime" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Waktu Publish
-                  </label>
-                  <input
+                <FormField label="Format" required>
+                  <Select value={formRow.format} onValueChange={(value) => handleFormRowChange('format', value ?? FORMAT_OPTIONS[0])}>
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FORMAT_OPTIONS.map((item) => (
+                        <SelectItem key={item} value={item}>{item}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              </FormGrid>
+            </FormSection>
+
+            <FormSection title="Isi konten" description="Detail inti yang akan dipakai saat tim melakukan produksi atau publish.">
+              <FormGrid>
+                <FormField label="Topik" htmlFor="topic" required>
+                  <Input id="topic" value={formRow.topic} onChange={(e) => handleFormRowChange('topic', e.target.value)} className="h-10" />
+                </FormField>
+
+                <FormField label="Headline" htmlFor="headline" required>
+                  <Input id="headline" value={formRow.headline} onChange={(e) => handleFormRowChange('headline', e.target.value)} className="h-10" />
+                </FormField>
+              </FormGrid>
+
+              <FormGrid className="md:grid-cols-3">
+                <FormField label="Waktu publish" htmlFor="scheduledTime">
+                  <Input
                     id="scheduledTime"
-                    type="text"
                     value={formRow.scheduled_time}
                     onChange={(e) => handleFormRowChange('scheduled_time', e.target.value)}
                     placeholder="10:00 WIB"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="h-10"
                   />
-                </div>
-                <div>
-                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Status
-                  </label>
-                  <input
-                    id="status"
-                    type="text"
-                    value={formRow.status}
-                    onChange={(e) => handleFormRowChange('status', e.target.value)}
-                    placeholder="To Do"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Keterangan
-                  </label>
-                  <input
-                    id="notes"
-                    type="text"
-                    value={formRow.notes}
-                    onChange={(e) => handleFormRowChange('notes', e.target.value)}
-                    placeholder="Baru"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+                </FormField>
 
-              <div>
-                <label htmlFor="visualDescription" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Deskripsi Visual
-                </label>
-                <textarea
+                <FormField label="Status">
+                  <Select value={formRow.status} onValueChange={(value) => handleFormRowChange('status', value ?? STATUS_OPTIONS[0])}>
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((item) => (
+                        <SelectItem key={item} value={item}>{item}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+
+                <FormField label="Keterangan" htmlFor="notes">
+                  <Input id="notes" value={formRow.notes} onChange={(e) => handleFormRowChange('notes', e.target.value)} className="h-10" />
+                </FormField>
+              </FormGrid>
+
+              <FormField label="Deskripsi visual" htmlFor="visualDescription">
+                <Textarea
                   id="visualDescription"
                   value={formRow.visual_description}
                   onChange={(e) => handleFormRowChange('visual_description', e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="contentBody" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Isi Konten
-                </label>
-                <textarea
-                  id="contentBody"
-                  value={formRow.content_body}
-                  onChange={(e) => handleFormRowChange('content_body', e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="hookCaption" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Hook / Caption
-                </label>
-                <textarea
-                  id="hookCaption"
-                  value={formRow.hook_caption}
-                  onChange={(e) => handleFormRowChange('hook_caption', e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <FormField label="Isi konten" htmlFor="contentBody">
+                <Textarea id="contentBody" value={formRow.content_body} onChange={(e) => handleFormRowChange('content_body', e.target.value)} rows={5} />
+              </FormField>
 
-              <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={handleCancelCrudModal}
-                  className="px-5 py-2.5 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Batal
-                </button>
-                <Button type="submit" disabled={saving} className="px-5 py-2.5 text-sm font-semibold">
-                  {saving ? 'Menyimpan...' : editingIndex === null ? 'Tambah Baris' : 'Simpan Perubahan'}
-                </Button>
-              </div>
-            </form>
+              <FormField label="Hook / caption" htmlFor="hookCaption">
+                <Textarea id="hookCaption" value={formRow.hook_caption} onChange={(e) => handleFormRowChange('hook_caption', e.target.value)} rows={4} />
+              </FormField>
+            </FormSection>
+
+            <DialogFooter className="sticky bottom-0 bg-background/95 backdrop-blur">
+              <Button type="button" variant="outline" onClick={handleCancelCrudModal}>Batal</Button>
+              <Button type="submit" disabled={savingRow}>
+                {savingRow ? 'Menyimpan...' : editingIndex === null ? 'Tambah Item' : 'Simpan Perubahan'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAiModal} onOpenChange={(nextOpen) => (!nextOpen ? closeAiWizard() : setShowAiModal(true))}>
+        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto p-0 sm:max-w-5xl" showCloseButton={false}>
+          <div className="border-b border-border px-5 py-4">
+            <DialogHeader>
+              <DialogTitle>AI Content Plan Wizard</DialogTitle>
+              <DialogDescription>Pilih preset, atur parameter, review preview hasil AI, lalu simpan ke content plan ketika sudah yakin.</DialogDescription>
+            </DialogHeader>
           </div>
-        </div>
-      )}
 
-      {/* AI Modal */}
-      {showAiModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl my-8 overflow-hidden">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <h3 className="text-lg font-semibold text-gray-900">✨ AI Content Plan Generator</h3>
-              <button
-                type="button"
-                onClick={() => !loading && setShowAiModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-              >
-                ✕
-              </button>
+          <div className="space-y-5 px-5 py-5">
+            <div className="grid gap-2 md:grid-cols-3">
+              {WIZARD_STEPS.map((label, index) => {
+                const isActive = wizardStep === index
+                const isComplete = wizardStep > index
+                return (
+                  <div
+                    key={label}
+                    className={cn(
+                      'rounded-xl border px-4 py-3',
+                      isActive ? 'border-foreground bg-foreground text-background' : undefined,
+                      !isActive && isComplete ? 'border-border bg-muted/40 text-foreground' : undefined,
+                      !isActive && !isComplete ? 'border-border bg-background text-muted-foreground' : undefined
+                    )}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em]">Step {index + 1}</p>
+                    <p className="mt-1 font-medium">{label}</p>
+                  </div>
+                )
+              })}
             </div>
-            <form onSubmit={handleGenerateAi} className="p-4 md:p-6 space-y-4">
-              {aiError && (
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 p-3 rounded-lg" role="alert">
-                  {aiError}
-                </div>
-              )}
 
-              {loading && (
-                <div className="space-y-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-blue-900">{streamMessage}</span>
-                    <span className="text-sm font-bold text-blue-600">
-                      {streamProgress.current}/{streamProgress.total}
-                    </span>
-                  </div>
-                  {streamProgress.total > 0 && (
-                    <div className="w-full bg-blue-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-blue-600 h-full transition-all duration-300"
-                        style={{ width: `${(streamProgress.current / streamProgress.total) * 100}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+            {aiError ? (
+              <Alert variant="destructive">
+                <AlertTitle>Proses AI belum berhasil</AlertTitle>
+                <AlertDescription>{aiError}</AlertDescription>
+              </Alert>
+            ) : null}
 
-              <div className={`space-y-4 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
-                {/* Row 1: Niche + Platform */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="aiNiche" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Niche *
-                    </label>
-                    <input
-                      id="aiNiche"
-                      type="text"
-                      value={niche}
-                      onChange={(e) => setNiche(e.target.value)}
-                      required
-                      placeholder="e.g., Digital Marketing"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="aiPlatform" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Platform *
-                    </label>
-                    <select
-                      id="aiPlatform"
-                      value={platform}
-                      onChange={(e) => setPlatform(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {PLATFORMS.map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row 2: Tone + Target Audience */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="aiTone" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Tone / Gaya Konten
-                    </label>
-                    <select
-                      id="aiTone"
-                      value={tone}
-                      onChange={(e) => setTone(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {TONES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="aiTargetAudience" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Target Audience
-                    </label>
-                    <input
-                      id="aiTargetAudience"
-                      type="text"
-                      value={aiTargetAudience}
-                      onChange={(e) => setAiTargetAudience(e.target.value)}
-                      placeholder="e.g., Wanita 25-34, urban"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 3: Campaign idea + Start date */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="aiContentIdea" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Ide / Campaign Utama
-                    </label>
-                    <input
-                      id="aiContentIdea"
-                      type="text"
-                      value={contentIdea}
-                      onChange={(e) => setContentIdea(e.target.value)}
-                      placeholder="Opsional"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="aiStartDate" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Tanggal Mulai
-                    </label>
-                    <DatePicker
-                      id="aiStartDate"
-                      selected={startDate}
-                      onChange={(date: Date | null) => setStartDate(date)}
-                      dateFormat="dd/MM/yyyy"
-                      placeholderText="Pilih tanggal mulai"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      calendarClassName="text-sm"
-                      popperClassName="z-[60]"
-                      popperPlacement="bottom-start"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 4: Month label + posts per week + duration */}
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <label htmlFor="aiMonthLabel" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Label Periode
-                    </label>
-                    <input
-                      id="aiMonthLabel"
-                      type="text"
-                      value={monthLabel}
-                      onChange={(e) => setMonthLabel(e.target.value)}
-                      placeholder="Opsional"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="aiContentPerWeek" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Konten / Minggu *
-                    </label>
-                    <input
-                      id="aiContentPerWeek"
-                      type="number"
-                      min={1}
-                      max={14}
-                      value={contentPerWeek}
-                      onChange={(e) => setContentPerWeek(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="aiDurationWeeks" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Durasi (Minggu) *
-                    </label>
-                    <input
-                      id="aiDurationWeeks"
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={durationWeeks}
-                      onChange={(e) => setDurationWeeks(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Replace toggle */}
-                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50">
-                  <input
-                    type="checkbox"
-                    checked={replaceExisting}
-                    onChange={(e) => setReplaceExisting(e.target.checked)}
-                    className="w-4 h-4 rounded accent-blue-600"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">Ganti konten plan yang ada</p>
-                    <p className="text-xs text-gray-500">Centang untuk menghapus semua baris sebelum generate baru. Biarkan kosong untuk menambahkan ke yang sudah ada.</p>
-                  </div>
-                </label>
-              </div>
-
-              <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowAiModal(false)}
-                  disabled={loading}
-                  className="px-5 py-2.5 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            {wizardStep === 0 ? (
+              <div className="space-y-5">
+                <FormSection
+                  title="Pilih preset"
+                  description="Preset memberi starting point yang lebih cepat. Anda tetap bisa mengubah semua parameter di langkah berikutnya."
                 >
-                  Batal
-                </button>
-                <Button type="submit" disabled={loading} className="px-5 py-2.5 text-sm font-semibold">
-                  {loading
-                    ? `⏳ ${streamProgress.current}/${streamProgress.total}...`
-                    : '✨ Generate & Tambah'}
-                </Button>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {AI_PRESETS.map((preset) => {
+                      const active = selectedPresetId === preset.id
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => setWizardDefaultsFromPreset(preset.id)}
+                          className={cn(
+                            'rounded-xl border p-4 text-left transition-colors',
+                            active ? 'border-foreground bg-foreground text-background' : 'border-border bg-background hover:bg-muted/40'
+                          )}
+                        >
+                          <p className="font-medium">{preset.label}</p>
+                          <p className={cn('mt-2 text-sm leading-6', active ? 'text-background/80' : 'text-muted-foreground')}>{preset.summary}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {preset.examples.map((example) => (
+                              <span
+                                key={example}
+                                className={cn(
+                                  'rounded-full border px-2 py-1 text-xs',
+                                  active ? 'border-background/20 text-background/80' : 'border-border text-muted-foreground'
+                                )}
+                              >
+                                {example}
+                              </span>
+                            ))}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </FormSection>
+
+                <FormSection title="Business context" description="Semakin jelas niche dan target audience, semakin tajam preview yang dihasilkan.">
+                  <FormGrid>
+                    <FormField label="Platform" required>
+                      <Select value={platform} onValueChange={(value) => setPlatform(value ?? PLATFORMS[0])}>
+                        <SelectTrigger className="h-10 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PLATFORMS.map((item) => (
+                            <SelectItem key={item} value={item}>{item}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+
+                    <FormField
+                      label="Niche"
+                      htmlFor="aiNiche"
+                      required
+                      description="Contoh input: klinik gigi keluarga, skincare acne-prone, catering sehat untuk kantor."
+                    >
+                      <Input id="aiNiche" value={niche} onChange={(e) => setNiche(e.target.value)} className="h-10" />
+                    </FormField>
+
+                    <FormField
+                      label="Target audience"
+                      htmlFor="aiAudience"
+                      description="Contoh: wanita 25-34 di kota besar, pemilik UMKM F&B, orang tua dengan anak balita."
+                      className="md:col-span-2"
+                    >
+                      <Input id="aiAudience" value={aiTargetAudience} onChange={(e) => setAiTargetAudience(e.target.value)} className="h-10" />
+                    </FormField>
+                  </FormGrid>
+                </FormSection>
               </div>
-            </form>
+            ) : null}
+
+            {wizardStep === 1 ? (
+              <div className="space-y-5">
+                <FormSection title="Konfigurasi plan" description="Atur parameter sebelum AI membuat preview. Semua hasil di step berikutnya masih aman untuk direview dulu.">
+                  <FormField label="Preset aktif">
+                    <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
+                      <p className="font-medium">{selectedPreset.label}</p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{selectedPreset.summary}</p>
+                    </div>
+                  </FormField>
+
+                  <FormGrid>
+                    <FormField label="Campaign / angle utama" htmlFor="aiContentIdea" description="Boleh ubah suggestion bawaan preset jika Anda ingin angle yang lebih spesifik.">
+                      <Textarea id="aiContentIdea" value={contentIdea} onChange={(e) => setContentIdea(e.target.value)} rows={4} />
+                    </FormField>
+
+                    <FormField label="Tone konten">
+                      <Select value={tone} onValueChange={(value) => setTone(value ?? TONES[0])}>
+                        <SelectTrigger className="h-10 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TONES.map((item) => (
+                            <SelectItem key={item} value={item}>{item}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                  </FormGrid>
+
+                  <FormGrid className="md:grid-cols-3">
+                    <FormField label="Tanggal mulai" htmlFor="aiStartDate">
+                      <DatePicker
+                        id="aiStartDate"
+                        selected={startDate}
+                        onChange={(date: Date | null) => setStartDate(date)}
+                        dateFormat="dd/MM/yyyy"
+                        placeholderText="Pilih tanggal mulai"
+                        className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                        calendarClassName="text-sm"
+                        popperClassName="z-[70]"
+                        popperPlacement="bottom-start"
+                      />
+                    </FormField>
+
+                    <FormField label="Label periode" htmlFor="aiMonthLabel">
+                      <Input id="aiMonthLabel" value={monthLabel} onChange={(e) => setMonthLabel(e.target.value)} placeholder="April 2026" className="h-10" />
+                    </FormField>
+
+                    <FormField label="Konten per minggu" htmlFor="aiContentPerWeek">
+                      <Input
+                        id="aiContentPerWeek"
+                        type="number"
+                        min={1}
+                        max={14}
+                        value={contentPerWeek}
+                        onChange={(e) => setContentPerWeek(Number(e.target.value))}
+                        className="h-10"
+                      />
+                    </FormField>
+                  </FormGrid>
+
+                  <FormGrid className="md:grid-cols-[1fr_1fr_auto]">
+                    <FormField label="Durasi (minggu)" htmlFor="aiDurationWeeks">
+                      <Input
+                        id="aiDurationWeeks"
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={durationWeeks}
+                        onChange={(e) => setDurationWeeks(Number(e.target.value))}
+                        className="h-10"
+                      />
+                    </FormField>
+
+                    <FormField label="Total estimasi output">
+                      <div className="flex h-10 items-center rounded-lg border border-border bg-muted/40 px-3 text-sm font-medium">
+                        {estimatedCount} konten
+                      </div>
+                    </FormField>
+
+                    <FormField label="Replace existing">
+                      <div className="flex h-10 items-center gap-3 rounded-lg border border-border px-3">
+                        <Switch checked={replaceExisting} onCheckedChange={setReplaceExisting} />
+                        <span className="text-sm text-muted-foreground">Hapus item lama saat save</span>
+                      </div>
+                    </FormField>
+                  </FormGrid>
+                </FormSection>
+
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle className="text-base">Contoh arah hasil dari preset</CardTitle>
+                    <CardDescription>Preview akhir tetap dibuat oleh AI, tetapi contoh ini membantu Anda mengecek apakah preset dan niche sudah tepat.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-wrap gap-2">
+                    {selectedPreset.examples.map((example) => (
+                      <Badge key={example} variant="secondary">{example}</Badge>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : null}
+
+            {wizardStep === 2 ? (
+              <div className="space-y-5">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Ringkasan konfigurasi</CardTitle>
+                    <CardDescription>AI akan membuat preview berdasarkan parameter berikut. Data belum disimpan ke database.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-border bg-background px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Preset</p>
+                      <p className="mt-1 font-medium">{selectedPreset.label}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Platform</p>
+                      <p className="mt-1 font-medium">{platform}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Niche</p>
+                      <p className="mt-1 font-medium">{niche || '-'}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-background px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Output</p>
+                      <p className="mt-1 font-medium">{estimatedCount} konten</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {previewLoading ? (
+                  <Card>
+                    <CardContent className="space-y-4 py-6">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-medium">AI sedang menyiapkan preview</p>
+                          <p className="text-sm text-muted-foreground">{streamMessage || 'Mohon tunggu, hasil akan muncul bertahap.'}</p>
+                        </div>
+                        <Badge variant="secondary">
+                          {streamProgress.current}/{streamProgress.total || estimatedCount}
+                        </Badge>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full bg-foreground transition-all duration-300"
+                          style={{ width: `${streamProgress.total ? (streamProgress.current / streamProgress.total) * 100 : 8}%` }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
+                {!previewLoading && previewRows.length === 0 ? (
+                  <PageEmptyState
+                    title="Preview belum dibuat"
+                    description="Kembali ke langkah konfigurasi lalu jalankan AI untuk membuat draft yang bisa direview."
+                  />
+                ) : null}
+
+                {!previewLoading && previewRows.length > 0 ? (
+                  <div className="space-y-4">
+                    <Alert>
+                      <AlertTitle>Preview aman direview</AlertTitle>
+                      <AlertDescription>Item di bawah belum masuk database. Simpan hanya jika hasilnya sudah sesuai.</AlertDescription>
+                    </Alert>
+
+                    {previewWeekKeys.map((weekLabel) => {
+                      const groupRows = previewRows.filter((row) => row.week_label === weekLabel)
+                      return (
+                        <Card key={weekLabel}>
+                          <CardHeader className="border-b border-border bg-muted/40">
+                            <CardTitle className="text-base">{weekLabel}</CardTitle>
+                            <CardDescription>{groupRows.length} konten preview</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-3 pt-4">
+                            {groupRows.map((row, index) => (
+                              <div key={`${row.date}-${row.headline}-${index}`} className="rounded-xl border border-border bg-background p-4">
+                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                  <div className="space-y-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="font-medium">{row.headline}</p>
+                                      <Badge variant="outline">{row.format}</Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">{row.date} • {row.day} • {row.scheduled_time}</p>
+                                    <p className="text-sm text-muted-foreground">{row.topic}</p>
+                                  </div>
+                                  <Badge variant="secondary">{row.status}</Badge>
+                                </div>
+                                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Visual</p>
+                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{row.visual_description}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Hook / Caption</p>
+                                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{row.hook_caption}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-        </div>
-      )}
-    </div>
+
+          <DialogFooter>
+            {wizardStep === 0 ? (
+              <>
+                <Button type="button" variant="outline" onClick={closeAiWizard}>Batal</Button>
+                <Button type="button" onClick={() => setWizardStep(1)} disabled={!niche.trim()}>
+                  Lanjut ke Konfigurasi
+                </Button>
+              </>
+            ) : null}
+
+            {wizardStep === 1 ? (
+              <>
+                <Button type="button" variant="outline" onClick={() => setWizardStep(0)}>Kembali</Button>
+                <Button type="button" onClick={handlePreviewGenerate} disabled={!niche.trim() || previewLoading}>
+                  {previewLoading ? 'Menyiapkan preview...' : 'Buat Preview AI'}
+                </Button>
+              </>
+            ) : null}
+
+            {wizardStep === 2 ? (
+              <>
+                <Button type="button" variant="outline" onClick={() => setWizardStep(1)} disabled={previewLoading || savingPreview}>
+                  Edit Konfigurasi
+                </Button>
+                <Button type="button" variant="outline" onClick={handlePreviewGenerate} disabled={previewLoading || savingPreview}>
+                  Preview Ulang
+                </Button>
+                <Button type="button" onClick={handleSavePreview} disabled={previewLoading || savingPreview || previewRows.length === 0}>
+                  {savingPreview ? 'Menyimpan...' : 'Simpan ke Content Plan'}
+                </Button>
+              </>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </PageShell>
   )
 }

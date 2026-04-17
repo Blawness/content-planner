@@ -16,7 +16,7 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login, enterAsGuest } = useAuth()
+  const { login } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const from = searchParams.get('from')
@@ -79,20 +79,6 @@ function LoginForm() {
             Daftar
           </Link>
         </p>
-        <div className="pt-2 border-t border-border">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-              enterAsGuest()
-              router.push('/dashboard')
-              router.refresh()
-            }}
-          >
-            Masuk sebagai tamu
-          </Button>
-        </div>
       </div>
     </main>
   )
