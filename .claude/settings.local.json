@@ -3,7 +3,11 @@
     "allow": [
       "Bash(tail -100 .next/dev/server/*.log)",
       "mcp__context7__resolve-library-id",
-      "mcp__context7__query-docs"
+      "mcp__context7__query-docs",
+      "Bash(npm run *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['packages'].get\\('node_modules/@base-ui/react',{}\\).get\\('version','not found'\\)\\)\")",
+      "Bash(node -e \"const d=require\\('./package-lock.json'\\); console.log\\(d.packages['node_modules/@base-ui/react']?.version\\)\")",
+      "Bash(node -e \"const d=require\\('./package-lock.json'\\); const pkg=d.packages['node_modules/@base-ui/react']; console.log\\('version:', pkg?.version\\); console.log\\('resolved:', pkg?.resolved\\);\")"
     ]
   }
 }
