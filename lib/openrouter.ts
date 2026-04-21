@@ -1,16 +1,23 @@
 export async function openRouterChat(
   messages: { role: string; content: string }[],
   model: string = 'google/gemini-2.5-flash',
-  requireJson: boolean = true
+  requireJson: boolean = true,
+  maxTokens: number = 4096
 ) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY is not set');
   }
 
-  const bodyData: { model: string; messages: { role: string; content: string }[]; response_format?: { type: string } } = {
+  const bodyData: {
+    model: string;
+    messages: { role: string; content: string }[];
+    max_tokens: number;
+    response_format?: { type: string };
+  } = {
     model,
     messages,
+    max_tokens: maxTokens,
   };
   if (requireJson) {
     bodyData.response_format = { type: 'json_object' };

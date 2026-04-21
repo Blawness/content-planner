@@ -1,411 +1,309 @@
-# PRD --- AI Content Planner (Web App)
+# PRD — AI Content Planner (Internal Tool)
 
 ## 1. Overview
 
-AI Content Planner adalah aplikasi web yang membantu bisnis
-merencanakan, mengelola, dan menganalisis konten menggunakan AI.
+AI Content Planner adalah internal tool berbasis web untuk merencanakan dan mengelola konten menggunakan AI.
 
-Aplikasi ini memungkinkan pengguna untuk: - Menghasilkan ide konten
-secara otomatis - Membuat content calendar - Mengelola proyek konten -
-Melacak waktu pengerjaan konten - Mendapatkan analisis produktivitas -
-Menggunakan AI assistant untuk strategi konten
+Aplikasi ini memungkinkan pengguna untuk:
+- Menghasilkan jadwal konten secara otomatis dengan AI
+- Mengelola content plan (tambah, edit, hapus item)
+- Melacak waktu pengerjaan konten
+- Chat dengan AI untuk strategi konten
+- Admin mengelola user dan konfigurasi AI model
 
-Target utama produk ini adalah **bisnis, tim marketing, dan content
-creator profesional**.
+**Target pengguna:** Tim internal (bukan produk publik / tidak ada monetisasi).
 
-------------------------------------------------------------------------
+---
 
-# 2. Product Goals
+## 2. Product Goals
 
-## Business Goals
+- Mempercepat proses perencanaan konten bulanan/mingguan
+- Memberikan satu tempat terpusat untuk semua item content plan
+- Memudahkan tracking status dan waktu pengerjaan konten
 
--   Membantu bisnis meningkatkan konsistensi konten
--   Menghemat waktu perencanaan konten
--   Memberikan insight produktivitas tim
--   Menyediakan AI assistant untuk strategi konten
+---
 
-## User Goals
+## 3. Core Features
 
-User ingin: - Mendapatkan ide konten dengan cepat - Mengatur jadwal
-posting - Mengelola tugas konten dalam tim - Mengukur produktivitas
-kerja
+### 3.1 Content Plan Manager
 
-------------------------------------------------------------------------
+Pengguna dapat melihat, membuat, mengedit, dan menghapus item content plan.
 
-# 3. Target Users
+Setiap item memiliki field:
+- `week_label` — label minggu (contoh: "Minggu 1")
+- `date` — tanggal posting (format: DD/MM/YYYY)
+- `day` — nama hari
+- `topic` — topik konten
+- `format` — format konten (Single Post, Carousel, Reels)
+- `headline` — judul / headline konten
+- `visual_description` — deskripsi visual
+- `content_body` — isi konten
+- `hook_caption` — hook / caption pembuka
+- `scheduled_time` — jam posting
+- `status` — To Do / In Review / Done
+- `notes` — catatan tambahan
 
-## Primary Users
+Semua item content plan dapat dilihat oleh seluruh pengguna (shared view).
 
--   Digital marketing team
--   Social media manager
--   Content strategist
--   Startup marketing team
--   Marketing agency
+---
 
-## Secondary Users
+### 3.2 AI Schedule Generator
 
--   Freelancer content creator
--   Small business owner
--   Personal brand builder
+AI dapat membuat jadwal konten otomatis menggunakan wizard berbasis langkah.
 
-------------------------------------------------------------------------
+#### Input (via wizard)
 
-# 4. Core Features
+**Step 1 — Preset (opsional):**
+- Awareness, Selling, atau Engagement preset dengan default yang sudah dikonfigurasi
 
-## 4.1 AI Content Idea Generator
+**Step 2 — Konfigurasi:**
+- Platform (Instagram / TikTok / LinkedIn)
+- Niche bisnis
+- Content idea / tema campaign
+- Tone (Edukatif / Promosi / Entertaining / Inspiratif / Story Telling)
+- Target audience
+- Jumlah konten per minggu
+- Durasi (minggu)
+- Start date
 
-AI dapat menghasilkan ide konten berdasarkan input pengguna.
+**Step 3 — Preview:**
+- Pengguna dapat mereview hasil generate sebelum disimpan
 
-### Input
+#### Output
 
-User memasukkan: - niche bisnis - platform (Instagram, TikTok,
-LinkedIn) - goal konten - target audience - jumlah ide konten
+AI menghasilkan daftar item content plan yang siap disimpan ke database. Output di-stream secara real-time via SSE (Server-Sent Events).
 
-### Output
+Contoh output per item:
 
-AI menghasilkan: - judul konten - hook - format konten - caption draft -
-CTA
+```
+Week: Minggu 1
+Date: 21/04/2026
+Day: Selasa
+Topic: Pentingnya Konsistensi Konten
+Format: Carousel
+Headline: 5 Alasan Konsistensi Konten Itu Penting
+Hook: Brand yang konsisten tumbuh 3x lebih cepat
+Scheduled Time: 09:00
+Status: To Do
+```
 
-### Example
+---
 
-    Title: 5 Kesalahan Branding UMKM
-    Hook: 90% UMKM gagal branding karena ini
-    Format: Instagram Carousel
-    CTA: Simpan post ini
+### 3.3 AI Content Idea Generator
 
-AI menggunakan **OpenRouter API** sebagai gateway model.
+Pengguna dapat menghasilkan ide konten berdasarkan input berikut:
+- Niche bisnis
+- Platform
+- Goal konten
+- Target audience
+- Jumlah ide (1–10)
 
-------------------------------------------------------------------------
+Output per ide: judul, hook, format, caption draft, CTA.
 
-## 4.2 AI Content Schedule Generator
+---
 
-AI dapat membuat jadwal konten otomatis.
+### 3.4 Time Tracker
 
-### Input
+Pengguna dapat melacak waktu pengerjaan secara manual.
 
--   jumlah konten per minggu
--   platform
--   tema campaign
--   durasi campaign
+- Input: tanggal, waktu mulai, waktu selesai
+- Output: durasi dalam menit
+- Data disimpan per user
 
-### Output
+---
 
-Content calendar.
+### 3.5 AI Chat Assistant
 
-Contoh:
+Pengguna dapat chat bebas dengan AI untuk strategi konten.
 
-    Week 1
-    Mon - Edukasi
-    Wed - Storytelling
-    Fri - Promotional
+Contoh penggunaan:
+- "Buatkan 10 ide konten untuk brand skincare di Instagram"
+- "Bagaimana meningkatkan engagement di TikTok?"
 
-    Week 2
-    Tue - Tutorial
-    Thu - Case Study
-    Sat - Behind The Scene
+---
 
-Output ditampilkan dalam **calendar planner**.
+### 3.6 Admin Panel
 
-------------------------------------------------------------------------
+Hanya dapat diakses oleh superuser.
 
-## 4.3 Project Management
+Fitur:
+- Manajemen user (lihat semua user, toggle role admin/superuser)
+- Konfigurasi AI model aktif (via `AppSetting`)
+- Registrasi user baru dikendalikan dari sini (jika dibatasi)
 
-User dapat membuat proyek konten.
+---
 
-Contoh:
+## 4. User Flow
 
-    Project: Ramadan Campaign
-    Duration: 30 Days
-    Team: 4 Members
-    Platform: Instagram + TikTok
+### Flow Utama
 
-Setiap proyek memiliki: - task list - deadline - assignee - status
+```
+Login
+↓
+Dashboard (overview content plan minggu ini)
+↓
+Schedule Page → Generate dengan AI atau Tambah Manual
+↓
+Preview hasil → Simpan ke content plan
+↓
+Kelola item (edit status, edit konten, hapus)
+```
 
-### Task Status
+### Daily Usage
 
--   Backlog
--   In Progress
--   Review
--   Done
+```
+Buka Dashboard
+↓
+Cek item minggu ini
+↓
+Update status item (To Do → In Review → Done)
+↓
+(Opsional) Track waktu pengerjaan
+```
 
-------------------------------------------------------------------------
+---
 
-## 4.4 Time Tracker
+## 5. Tech Stack
 
-User dapat melacak waktu pengerjaan task.
+### Frontend
 
-### Example
+Next.js (App Router) — UI, dashboard, content planner, AI chat interface
 
-    Task: Edit Video
-    Start Timer
-    Stop Timer
+Libraries: TanStack Query, shadcn/ui, date-fns, react-datepicker
 
-    Total Time: 2h 15m
+### Backend
 
-Time tracker digunakan untuk: - analisis produktivitas - estimasi durasi
-task
+Next.js Route Handlers (serverless) — REST API, auth, AI orchestration
 
-------------------------------------------------------------------------
+### Database
 
-## 4.5 AI Task Prediction
+PostgreSQL + Prisma ORM
 
-AI dapat memprediksi durasi task berdasarkan histori.
+### Authentication
 
-### Example
+JWT — disimpan di `sessionStorage` + cookie (untuk middleware)
 
-    Task: Edit Instagram Reel
-    Predicted Time: 2 Hours
-    Confidence: 82%
+### AI Integration
 
-Prediksi menggunakan data: - histori task - time tracking - kompleksitas
-task
+OpenRouter API — gateway untuk model AI. Default model: `google/gemini-2.5-flash`. Model aktif dikonfigurasi via `AppSetting`.
 
-------------------------------------------------------------------------
-
-## 4.6 AI Chat Assistant
-
-User dapat chat dengan AI untuk membantu strategi konten.
-
-### Example Prompt
-
-    Buatkan 30 ide konten untuk brand skincare
-
-atau
-
-    Bagaimana meningkatkan engagement Instagram?
-
-AI dapat memberikan: - ide konten - strategi konten - template caption -
-rekomendasi waktu posting
-
-------------------------------------------------------------------------
-
-## 4.7 Productivity Analytics
-
-Dashboard analitik produktivitas.
-
-### Metrics
-
--   total task completed
--   average task duration
--   productivity score
--   team performance
-
-### Example Insight
-
-    Video editing tasks take 35% longer than predicted.
-    Posting consistency dropped 20% this week.
-
-------------------------------------------------------------------------
-
-# 5. User Flow
-
-## Onboarding Flow
-
-    Sign Up
-    ↓
-    Create Workspace
-    ↓
-    Create First Project
-    ↓
-    Generate Content Plan
-    ↓
-    Start Managing Tasks
-
-## Daily Usage Flow
-
-    Open Dashboard
-    ↓
-    Check Content Calendar
-    ↓
-    Work on Tasks
-    ↓
-    Track Time
-    ↓
-    Review Analytics
-
-------------------------------------------------------------------------
-
-# 6. Monetization
-
-Model: **Freemium**
-
-## Free Plan
-
--   1 workspace
--   1 project
--   20 AI generations per month
--   basic analytics
-
-## Pro Plan
-
--   unlimited projects
--   unlimited AI generation
--   advanced analytics
--   team collaboration
--   priority AI processing
-
-## Team Plan
-
--   multi workspace
--   team analytics
--   admin role management
--   API access
-
-------------------------------------------------------------------------
-
-# 7. Tech Stack
-
-## Frontend
-
-Next.js
-
-Responsibilities: - UI - dashboard - content planner - AI chat interface
-
-## Backend
-
-Node.js
-
-Responsibilities: - REST API - authentication - AI orchestration -
-analytics processing
-
-## Database
-
-PostgreSQL with Prisma ORM
-
-Digunakan untuk menyimpan: - user data - projects - tasks - time
-tracking - AI request history
-
-## Deployment
+### Deployment
 
 Vercel
 
-Digunakan untuk: - hosting frontend - serverless backend
+---
 
-## AI Integration
+## 6. Database Schema
 
-OpenRouter API
+### User
 
-Digunakan untuk: - ide konten - chat assistant - content scheduling -
-task prediction
+```
+id
+email
+password_hash
+is_superuser  — platform-level admin
+is_admin      — admin biasa
+created_at
+```
 
-------------------------------------------------------------------------
+### ContentPlanItem
 
-# 8. Database Schema (Simplified)
+```
+id
+user_id       — siapa yang membuat item ini
+week_label
+date          — DD/MM/YYYY
+day
+topic
+format
+headline
+visual_description
+content_body
+hook_caption
+scheduled_time
+status        — To Do / In Review / Done
+notes
+sort_order
+created_at
+updated_at
+```
 
-## users
+### TimeEntry
 
-    id
-    email
-    password_hash
-    created_at
+```
+id
+user_id
+date          — YYYY-MM-DD
+start_time
+end_time
+duration      — menit
+created_at
+```
 
-## workspaces
+### AppSetting
 
-    id
-    owner_id
-    name
-    created_at
+```
+id
+key           — contoh: "active_ai_model"
+value
+updated_at
+```
 
-## projects
+---
 
-    id
-    workspace_id
-    name
-    description
-    start_date
-    end_date
+## 7. API Endpoints
 
-## tasks
+### Authentication
 
-    id
-    project_id
-    title
-    description
-    status
-    assignee
-    deadline
+```
+POST /api/auth/register
+POST /api/auth/login
+```
 
-## time_entries
+### Content Plan
 
-    id
-    task_id
-    user_id
-    start_time
-    end_time
-    duration
+```
+GET    /api/content-plan          — semua item (semua user)
+POST   /api/content-plan          — buat satu item
+POST   /api/content-plan/batch    — buat banyak item sekaligus (dari AI generate)
+GET    /api/content-plan/:id      — detail satu item
+PATCH  /api/content-plan/:id      — update item
+DELETE /api/content-plan/:id      — hapus item
+```
 
-## ai_requests
+### Time Entries
 
-    id
-    user_id
-    prompt
-    response
-    created_at
+```
+GET    /api/time-entries
+POST   /api/time-entries
+PATCH  /api/time-entries/:id
+DELETE /api/time-entries/:id
+```
 
-------------------------------------------------------------------------
+### AI
 
-# 9. API Endpoints
+```
+POST /api/ai/generate-content          — generate ide konten
+POST /api/ai/generate-schedule         — generate jadwal (non-streaming)
+POST /api/ai/generate-schedule-stream  — generate jadwal (SSE streaming)
+POST /api/ai/predict-task              — prediksi durasi task
+POST /api/ai/chat                      — free-form chat
+```
 
-## Authentication
+### Admin
 
-    POST /auth/register
-    POST /auth/login
+```
+GET    /api/admin/users           — daftar semua user
+PATCH  /api/admin/users/:userId   — update role user
+GET    /api/admin/settings        — baca app settings
+PATCH  /api/admin/settings        — update app settings (termasuk AI model)
+```
 
-## Projects
+---
 
-    GET /projects
-    POST /projects
-    GET /projects/:id
+## 8. Security
 
-## Tasks
-
-    POST /tasks
-    PATCH /tasks/:id
-    GET /tasks
-
-## AI
-
-    POST /ai/generate-content
-    POST /ai/generate-schedule
-    POST /ai/chat
-    POST /ai/predict-task
-
-------------------------------------------------------------------------
-
-# 10. Security
-
--   JWT authentication
--   password hashing (bcrypt)
--   rate limiting AI request
--   workspace-based access control
-
-------------------------------------------------------------------------
-
-# 11. Privacy Model
-
-Mode: **Team Sharing**
-
-Workspace members dapat: - melihat proyek - mengedit task - melihat
-analytics
-
-### Roles
-
--   Owner
--   Admin
--   Member
-
-------------------------------------------------------------------------
-
-# 12. Future Features
-
-Planned improvements: - AI caption generator - AI content performance
-prediction - social media API integration - auto posting scheduler -
-Slack / Notion integration
-
-------------------------------------------------------------------------
-
-# 13. Success Metrics
-
-Key performance indicators: - Daily active users - AI requests per
-user - Projects created per workspace - Retention rate - Paid conversion
-rate
+- JWT authentication (Bearer token di header)
+- Password hashing dengan bcrypt
+- Superuser-only access untuk admin endpoints
+- Rate limiting AI requests (via middleware atau konfigurasi Vercel)
