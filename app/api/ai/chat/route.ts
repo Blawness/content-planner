@@ -31,14 +31,6 @@ export async function POST(request: Request) {
     const aiContent = await openRouterChat(messages, model, false);
     const responseTimeMs = Date.now() - startedAt;
 
-    await prisma.aiRequest.create({
-      data: {
-        userId,
-        prompt: message,
-        response: aiContent,
-      },
-    });
-
     return NextResponse.json({ response: aiContent, model, responseTimeMs });
   } catch (e) {
     console.error('Error in ai chat:', e);

@@ -3,33 +3,10 @@ export type User = {
   email: string
 }
 
-export type Project = {
-  id: string
-  user_id: string
-  name: string
-  description: string | null
-  start_date: string | null
-  end_date: string | null
-  created_at?: string
-}
-
-export type TaskStatus = 'Backlog' | 'In Progress' | 'Review' | 'Done'
-
-export type Task = {
-  id: string
-  project_id: string
-  title: string
-  description: string | null
-  status: TaskStatus
-  assignee: string | null
-  deadline: string | null
-  created_at?: string
-}
-
 export type TimeEntry = {
   id: string
-  task_id: string
   user_id: string
+  date: string
   start_time: string
   end_time: string | null
   duration: number | null

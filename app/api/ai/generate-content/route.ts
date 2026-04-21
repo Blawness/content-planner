@@ -27,15 +27,6 @@ export async function POST(request: Request) {
       { role: 'user', content: prompt }
     ], model);
 
-    // Save history
-    await prisma.aiRequest.create({
-      data: {
-        userId,
-        prompt,
-        response: aiContent,
-      },
-    });
-
     let jsonResponse;
     try {
       jsonResponse = JSON.parse(aiContent);

@@ -106,7 +106,6 @@ export async function PUT(request: Request, { params }: Params) {
         isSuperuser: true,
         isAdmin: true,
         createdAt: true,
-        _count: { select: { aiRequests: true } },
       },
     })
 
@@ -116,7 +115,6 @@ export async function PUT(request: Request, { params }: Params) {
       is_superuser: updated.isSuperuser,
       is_admin: updated.isAdmin,
       role: updated.isSuperuser ? 'superuser' : updated.isAdmin ? 'admin' : 'user',
-      ai_requests: updated._count.aiRequests,
       created_at: updated.createdAt.toISOString(),
     })
   } catch (e) {

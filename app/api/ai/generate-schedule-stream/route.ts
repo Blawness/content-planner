@@ -73,19 +73,6 @@ export async function POST(request: NextRequest) {
             },
             {
               callAi: async (prompt: string) => openRouterChat([{ role: 'user', content: prompt }], model),
-              onAiCall: async (prompt: string, response: string) => {
-                try {
-                  await prisma.aiRequest.create({
-                    data: {
-                      userId,
-                      prompt,
-                      response,
-                    },
-                  });
-                } catch (error) {
-                  console.error('Error saving AI request:', error instanceof Error ? error.message : 'Unknown');
-                }
-              },
               onProgress: (event) => {
                 sendEvent({
                   type: 'progress',

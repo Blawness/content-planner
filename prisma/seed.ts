@@ -32,55 +32,38 @@ async function main() {
     },
   })
 
-  // ─── Create demo owner ───────────────────────────────────────────────────────
-  const ownerHash = await bcrypt.hash('password123', 10)
-  const owner = await prisma.user.create({
+  // ─── Create demo user ───────────────────────────────────────────────────────
+  const demoHash = await bcrypt.hash('password123', 10)
+  await prisma.user.create({
     data: {
       email: 'demo@example.com',
-      passwordHash: ownerHash,
+      passwordHash: demoHash,
     },
   })
 
   // ─── Create admin user ───────────────────────────────────────────────────────
   const adminHash = await bcrypt.hash('admin123', 10)
-  const adminUser = await prisma.user.create({
+  await prisma.user.create({
     data: {
       email: 'admin@example.com',
       passwordHash: adminHash,
+      isAdmin: true,
     },
   })
 
   // ─── Create member user ──────────────────────────────────────────────────────
   const memberHash = await bcrypt.hash('member123', 10)
-  const memberUser = await prisma.user.create({
+  await prisma.user.create({
     data: {
       email: 'member@example.com',
       passwordHash: memberHash,
     },
   })
 
-  // ─── Create project for owner ───────────────────────────────────────────────────
-  await prisma.project.create({
-    data: {
-      userId: owner.id,
-      name: 'AI Content Planner',
-      description: 'Getting the product ready for beta release',
-      tasks: {
-        create: [
-          { title: 'Setup Neon DB connection', status: 'DONE', assigneeId: owner.id },
-          { title: 'Create Prisma seed script', status: 'DONE', assigneeId: owner.id },
-          { title: 'Migrate middleware to proxy', status: 'DONE', assigneeId: owner.id },
-          { title: 'Integrate frontend with new APIs', status: 'IN_PROGRESS', assigneeId: adminUser.id },
-          { title: 'Test generated content formats', status: 'BACKLOG', assigneeId: memberUser.id },
-        ],
-      },
-    },
-  })
-
   console.log('Database has been seeded. 🌱')
   console.log('─────────────────────────────────────')
   console.log('Superuser : super@example.com        / superpassword123')
-  console.log('Owner     : demo@example.com         / password123')
+  console.log('Demo      : demo@example.com         / password123')
   console.log('Admin     : admin@example.com        / admin123')
   console.log('Member    : member@example.com       / member123')
 }

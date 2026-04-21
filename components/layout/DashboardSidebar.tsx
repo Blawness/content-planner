@@ -4,31 +4,11 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
-import {
-  LayoutDashboard,
-  Calendar,
-  FolderKanban,
-  Lightbulb,
-  Clock,
-  Timer,
-  MessageSquare,
-  BarChart2,
-  Settings,
-  ChevronDown
-} from 'lucide-react'
+import { LayoutDashboard, Clock, Settings } from 'lucide-react'
 
 const coreNav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/schedule', label: 'Content Plan', icon: Clock },
-]
-
-const workInProgressNav = [
-  { href: '/dashboard/chat', label: 'AI Chat', icon: MessageSquare },
-  { href: '/dashboard/projects', label: 'Projects', icon: FolderKanban },
-  { href: '/dashboard/ideas', label: 'AI Ideas', icon: Lightbulb },
-  { href: '/dashboard/calendar', label: 'Content Calendar', icon: Calendar },
-  { href: '/dashboard/tracker', label: 'Time Tracker', icon: Timer },
-  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
 ]
 
 const adminNav = [
@@ -40,10 +20,6 @@ export function DashboardSidebar() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
-  const [wipOpen, setWipOpen] = useState(false)
-  const showWip = Boolean(user?.isSuperuser)
-
-  const isWipActive = workInProgressNav.some(item => pathname === item.href || pathname.startsWith(item.href))
 
   return (
     <>
@@ -86,62 +62,16 @@ export function DashboardSidebar() {
               }`}
               onClick={() => setOpen(false)}
             >
-              <Icon 
+              <Icon
                 className={`mr-3 w-5 h-5 transition-transform duration-300 ${
                   active ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'
-                }`} 
+                }`}
               />
               {label}
             </Link>
           )
             })}
           </div>
-
-          {showWip && (
-            <div className="space-y-1 border-t border-border pt-4">
-              <button
-                type="button"
-                onClick={() => setWipOpen(!wipOpen)}
-                className={`group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
-                  isWipActive ? 'bg-background text-foreground shadow-sm' : 'text-foreground/80 hover:bg-background hover:text-foreground'
-                }`}
-              >
-                <ChevronDown
-                  className={`mr-3 h-5 w-5 transition-transform duration-300 ${
-                    wipOpen ? 'rotate-180' : ''
-                  } ${
-                    isWipActive ? 'scale-110' : 'group-hover:scale-110'
-                  }`}
-                />
-                <span>Lab Superuser</span>
-              </button>
-
-              {wipOpen && (
-                <div className="ml-3 space-y-1 border-l border-border pl-3">
-                  {workInProgressNav.map(({ href, label, icon: Icon }) => {
-                    const active = pathname === href || pathname.startsWith(href)
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        className={`group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
-                          active ? 'bg-background text-foreground shadow-sm' : 'text-foreground/70 hover:bg-background hover:text-foreground'
-                        }`}
-                        onClick={() => setOpen(false)}
-                      >
-                        <Icon
-                          className={`mr-3 h-5 w-5 transition-transform duration-300 ${
-                            active ? 'scale-110' : 'group-hover:scale-110 group-hover:-rotate-3'
-                          }`}
-                        />
-                        {label}
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
 
           {user?.isSuperuser && (
             <div className="space-y-1 border-t border-border pt-4">
