@@ -7,8 +7,17 @@ import { useAuth } from '@/components/providers/AuthProvider'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { FormField } from '@/components/ui/form-layout'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { PageHeader, PageLoadingState, PageShell } from '@/components/ui/page-shell'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -41,6 +50,9 @@ const OPENROUTER_MODELS = [
   { value: 'mistralai/mistral-small-3.1-24b-instruct', label: 'Mistral Small 3.1 24B' },
 ]
 
+type CreateForm = { email: string; password: string; is_superuser: boolean }
+type EditForm = { email: string; password: string; is_superuser: boolean }
+
 export default function AdminPage() {
   const router = useRouter()
   const { user, token, isLoading: authLoading } = useAuth()
@@ -53,6 +65,18 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'settings' | 'users'>('settings')
   const [draftModel, setDraftModel] = useState('')
   const [draftAiEnabled, setDraftAiEnabled] = useState(true)
+
+  // Create user modal
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createForm, setCreateForm] = useState<CreateForm>({ email: '', password: '', is_superuser: false })
+  const [createErr, setCreateErr] = useState('')
+
+  // Edit user modal
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [editForm, setEditForm] = useState<EditForm>({ email: '', password: '', is_superuser: false })
+  const [editErr, setEditErr] = useState('')
 
   useEffect(() => {
     if (authLoading) return
@@ -106,17 +130,59 @@ export default function AdminPage() {
     }
   }
 
-  async function handleToggleSuperuser(targetUser: AdminUser) {
+  function openCreateModal() {
+    setCreateForm({ email: '', password: '', is_superuser: false })
+    setCreateErr('')
+    setShowCreate(true)
+  }
+
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault()
     if (!token) return
+    setCreating(true)
+    setCreateErr('')
     try {
-      await apiClient(`/admin/users/${targetUser.id}`, {
-        method: 'PATCH',
+      const newUser = await apiClient<AdminUser>('/admin/users', {
+        method: 'POST',
         token,
-        body: JSON.stringify({ is_superuser: !targetUser.is_superuser }),
+        body: JSON.stringify(createForm),
       })
-      setUsers((prev) => prev.map((item) => (item.id === targetUser.id ? { ...item, is_superuser: !targetUser.is_superuser } : item)))
+      setUsers((prev) => [...prev, newUser])
+      setShowCreate(false)
     } catch (err) {
-      setSettingsMsg({ type: 'err', text: err instanceof Error ? err.message : 'Gagal mengubah role' })
+      setCreateErr(err instanceof Error ? err.message : 'Gagal membuat user')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  function openEditModal(targetUser: AdminUser) {
+    setEditForm({ email: targetUser.email, password: '', is_superuser: targetUser.is_superuser })
+    setEditErr('')
+    setEditingUser(targetUser)
+  }
+
+  async function handleEditUser(e: React.FormEvent) {
+    e.preventDefault()
+    if (!token || !editingUser) return
+    setSaving(true)
+    setEditErr('')
+    try {
+      const body: Record<string, unknown> = { is_superuser: editForm.is_superuser }
+      if (editForm.email !== editingUser.email) body.email = editForm.email
+      if (editForm.password) body.password = editForm.password
+
+      const updated = await apiClient<AdminUser>(`/admin/users/${editingUser.id}`, {
+        method: 'PUT',
+        token,
+        body: JSON.stringify(body),
+      })
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+      setEditingUser(null)
+    } catch (err) {
+      setEditErr(err instanceof Error ? err.message : 'Gagal menyimpan perubahan')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -159,7 +225,7 @@ export default function AdminPage() {
                   activeTab === tab ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {tab === 'settings' ? 'App Settings' : 'Users'}
+                {tab === 'settings' ? 'App Settings' : `Users (${users.length})`}
               </button>
             ))}
           </div>
@@ -237,12 +303,17 @@ export default function AdminPage() {
 
           {activeTab === 'users' ? (
             <Card className="overflow-hidden">
-              <CardHeader>
-                <CardTitle>Users</CardTitle>
-                <CardDescription>Kelola akses superuser dan hapus akun yang sudah tidak dipakai.</CardDescription>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Users</CardTitle>
+                  <CardDescription>Buat akun baru, edit data user, atau hapus akun yang sudah tidak dipakai. Registrasi publik dinonaktifkan.</CardDescription>
+                </div>
+                <Button type="button" onClick={openCreateModal} className="shrink-0">
+                  + Buat User
+                </Button>
               </CardHeader>
               <CardContent className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm">
+                <table className="w-full min-w-[760px] text-sm">
                   <thead className="border-b border-border text-left text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     <tr>
                       <th className="py-3 pr-4">Email</th>
@@ -260,24 +331,37 @@ export default function AdminPage() {
                           {targetUser.email}
                           {targetUser.id === user.id ? <span className="ml-2 text-xs text-muted-foreground">(kamu)</span> : null}
                         </td>
-                        <td className="py-3 pr-4">{targetUser.is_superuser ? 'Superuser' : 'User'}</td>
+                        <td className="py-3 pr-4">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            targetUser.is_superuser
+                              ? 'bg-destructive/15 text-destructive'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {targetUser.is_superuser ? 'Superuser' : 'User'}
+                          </span>
+                        </td>
                         <td className="py-3 pr-4">{targetUser.owned_workspaces}</td>
                         <td className="py-3 pr-4">{targetUser.ai_requests}</td>
                         <td className="py-3 pr-4">{new Date(targetUser.created_at).toLocaleDateString('id-ID')}</td>
                         <td className="py-3 text-right">
-                          {targetUser.id !== user.id ? (
-                            <div className="flex justify-end gap-2">
-                              <Button type="button" variant="outline" size="sm" onClick={() => handleToggleSuperuser(targetUser)}>
-                                {targetUser.is_superuser ? 'Revoke Superuser' : 'Jadikan Superuser'}
-                              </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => openEditModal(targetUser)}>
+                              Edit
+                            </Button>
+                            {targetUser.id !== user.id ? (
                               <Button type="button" variant="destructive" size="sm" onClick={() => handleDeleteUser(targetUser)}>
                                 Hapus
                               </Button>
-                            </div>
-                          ) : null}
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}
+                    {users.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-muted-foreground">Belum ada user.</td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
               </CardContent>
@@ -285,6 +369,131 @@ export default function AdminPage() {
           ) : null}
         </>
       ) : null}
+
+      {/* Create User Modal */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Buat User Baru</DialogTitle>
+            <DialogDescription>
+              Akun akan langsung aktif. User bisa login dengan email dan password yang kamu isi.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser} className="space-y-4">
+            {createErr ? (
+              <Alert variant="destructive">
+                <AlertDescription>{createErr}</AlertDescription>
+              </Alert>
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email</Label>
+              <Input
+                id="create-email"
+                type="email"
+                required
+                autoComplete="off"
+                value={createForm.email}
+                onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-password">Password</Label>
+              <Input
+                id="create-password"
+                type="password"
+                required
+                minLength={6}
+                autoComplete="new-password"
+                placeholder="Minimal 6 karakter"
+                value={createForm.password}
+                onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Superuser</p>
+                <p className="text-xs text-muted-foreground">Berikan akses penuh ke admin panel.</p>
+              </div>
+              <Switch
+                checked={createForm.is_superuser}
+                onCheckedChange={(v) => setCreateForm((f) => ({ ...f, is_superuser: v }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreate(false)} disabled={creating}>
+                Batal
+              </Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? 'Membuat...' : 'Buat User'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Modal */}
+      <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) setEditingUser(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Kosongkan field password jika tidak ingin mengubahnya.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditUser} className="space-y-4">
+            {editErr ? (
+              <Alert variant="destructive">
+                <AlertDescription>{editErr}</AlertDescription>
+              </Alert>
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                required
+                autoComplete="off"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-password">Password Baru</Label>
+              <Input
+                id="edit-password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="Kosongkan jika tidak ingin diubah"
+                value={editForm.password}
+                onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Superuser</p>
+                <p className="text-xs text-muted-foreground">
+                  {editingUser?.id === user?.id
+                    ? 'Kamu tidak bisa mencabut status superuser milikmu sendiri.'
+                    : 'Berikan atau cabut akses admin panel.'}
+                </p>
+              </div>
+              <Switch
+                checked={editForm.is_superuser}
+                disabled={editingUser?.id === user?.id}
+                onCheckedChange={(v) => setEditForm((f) => ({ ...f, is_superuser: v }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingUser(null)} disabled={saving}>
+                Batal
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

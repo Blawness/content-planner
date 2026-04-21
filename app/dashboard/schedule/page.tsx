@@ -455,6 +455,23 @@ export default function SchedulePage() {
     }
   }
 
+  async function handleQuickStatusChange(index: number, nextStatus: string) {
+    const current = rows[index]
+    if (!current || current.status === nextStatus) return
+
+    try {
+      if (current.id && token) {
+        const saved = await updateContentPlanItem(current.id, { ...current, status: nextStatus }, token)
+        setRows((prev) => sortRows(prev.map((row, itemIndex) => (itemIndex === index ? saved : row))))
+        return
+      }
+
+      setRows((prev) => sortRows(prev.map((row, itemIndex) => (itemIndex === index ? { ...row, status: nextStatus } : row))))
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : 'Gagal mengubah status item')
+    }
+  }
+
   const handlePreviewGenerate = useCallback(async () => {
     if (!token) return
     setAiError('')
@@ -632,6 +649,10 @@ export default function SchedulePage() {
           {isExpanded ? (
             <div className="border-t border-border bg-muted/20 px-4 py-4 md:px-6">
               <div className="grid gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Headline</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm font-medium leading-6">{row.headline || '-'}</p>
+                </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Topik</p>
                   <p className="mt-1 text-sm">{row.topic}</p>
@@ -660,6 +681,16 @@ export default function SchedulePage() {
                 </div>
               </div>
               <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                <Select value={row.status} onValueChange={(value) => void handleQuickStatusChange(globalIndex, value ?? STATUS_OPTIONS[0])}>
+                  <SelectTrigger className="h-9 w-full sm:w-[180px]">
+                    <SelectValue placeholder="Ubah status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((item) => (
+                      <SelectItem key={item} value={item}>{item}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button type="button" variant="outline" onClick={() => handleEdit(globalIndex)}>
                   <PencilLine className="size-4" />
                   Edit
