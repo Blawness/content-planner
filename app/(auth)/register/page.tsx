@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export default function RegisterPage() {
   return (
@@ -17,9 +18,9 @@ export default function RegisterPage() {
             Akun baru hanya dapat dibuat oleh admin. Hubungi superuser untuk mendapatkan akses.
           </p>
         </div>
-        <Button asChild className="w-full">
-          <Link href="/login">Kembali ke Login</Link>
-        </Button>
+        <Link href="/login" className={cn(buttonVariants(), 'w-full')}>
+          Kembali ke Login
+        </Link>
       </div>
     </main>
   )
