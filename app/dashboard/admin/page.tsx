@@ -36,7 +36,6 @@ type AdminUser = {
   is_superuser: boolean
   is_admin: boolean
   role: UserRole
-  owned_workspaces: number
   ai_requests: number
   created_at: string
 }
@@ -338,7 +337,6 @@ export default function AdminPage() {
                     <tr>
                       <th className="py-3 pr-4">Email</th>
                       <th className="py-3 pr-4">Role</th>
-                      <th className="py-3 pr-4">Workspaces</th>
                       <th className="py-3 pr-4">AI Requests</th>
                       <th className="py-3 pr-4">Bergabung</th>
                       <th className="py-3 text-right">Aksi</th>
@@ -356,7 +354,6 @@ export default function AdminPage() {
                             {ROLE_LABEL[targetUser.role]}
                           </span>
                         </td>
-                        <td className="py-3 pr-4">{targetUser.owned_workspaces}</td>
                         <td className="py-3 pr-4">{targetUser.ai_requests}</td>
                         <td className="py-3 pr-4">{new Date(targetUser.created_at).toLocaleDateString('id-ID')}</td>
                         <td className="py-3 text-right">

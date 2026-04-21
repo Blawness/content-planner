@@ -1,28 +1,24 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
-import { getUserWorkspaceIds } from '@/lib/rbac';
 
 export async function GET(request: Request) {
   try {
     const { sub: userId } = await requireAuth(request);
-    
-    const workspaceIds = await getUserWorkspaceIds(userId);
 
-    // 2. Get metrics from completed tasks
+    // Get completed tasks from user's projects
     const completedTasksCount = await prisma.task.count({
       where: {
-        project: { workspaceId: { in: workspaceIds } },
+        project: { userId },
         status: 'DONE',
-        // optionally filter by assigneeId = userId if we only want personal analytics
       }
     });
 
-    // 3. Get total and average duration from time entries in these workspaces
+    // Get time entries from user's projects
     const timeEntries = await prisma.timeEntry.findMany({
       where: {
         task: {
-          project: { workspaceId: { in: workspaceIds } }
+          project: { userId }
         },
         duration: { not: null }
       },
@@ -31,7 +27,7 @@ export async function GET(request: Request) {
 
     let totalDurationMins = 0;
     const taskDurations: Record<string, number> = {};
-    
+
     for (const entry of timeEntries) {
       const d = entry.duration || 0;
       totalDurationMins += d;
@@ -44,11 +40,9 @@ export async function GET(request: Request) {
       averageTaskDuration = Math.round(totalDurationMins / tasksTrackedCount);
     }
 
-    // 4. Productivity Score (simplified metric: 100 base + (tasks completed * 10) + (hours tracked / 2)
-    // Could be any arbitrary formula for now
     const productivityScore = Math.min(
       Math.round(100 + completedTasksCount * 10 + (totalDurationMins / 60) * 2),
-      1000 // cap
+      1000
     );
 
     return NextResponse.json({
@@ -62,7 +56,7 @@ export async function GET(request: Request) {
 
   } catch (e) {
     console.error("Error in analytics:", e);
-    if (e instanceof Response) return e; // Auth error
+    if (e instanceof Response) return e;
     return NextResponse.json(
       { message: e instanceof Error ? e.message : 'Internal Server Error' },
       { status: 500 }

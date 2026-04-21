@@ -3,16 +3,9 @@ export type User = {
   email: string
 }
 
-export type Workspace = {
-  id: string
-  owner_id: string
-  name: string
-  created_at: string
-}
-
 export type Project = {
   id: string
-  workspace_id: string
+  user_id: string
   name: string
   description: string | null
   start_date: string | null

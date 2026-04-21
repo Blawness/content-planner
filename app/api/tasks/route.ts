@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
 import { formatDate, toApiTaskStatus, fromApiTaskStatus } from '@/lib/api/serialize'
-import { getUserWorkspaceIds, requireWorkspaceRole } from '@/lib/rbac'
 
 function taskToJson(t: {
   id: string
@@ -32,12 +31,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId') || undefined
 
-    const workspaceIds = await getUserWorkspaceIds(userId)
-
     const list = await prisma.task.findMany({
       where: {
         project: {
-          workspaceId: { in: workspaceIds },
+          userId,
           ...(projectId ? { id: projectId } : {}),
         },
       },
@@ -70,14 +67,16 @@ export async function POST(request: Request) {
 
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { workspaceId: true },
+      select: { userId: true },
     })
     if (!project) {
       return NextResponse.json({ message: 'Project not found' }, { status: 404 })
     }
 
-    // Must be admin or owner to create tasks
-    await requireWorkspaceRole(userId, project.workspaceId, 'admin')
+    // User can only create tasks in their own projects
+    if (project.userId !== userId) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
 
     const status = body.status != null ? (fromApiTaskStatus(body.status) ?? 'BACKLOG') : 'BACKLOG'
     const deadline = body.deadline ? new Date(body.deadline) : null

@@ -2,33 +2,27 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
 import { formatDate } from '@/lib/api/serialize'
-import { requireWorkspaceRole } from '@/lib/rbac'
 
 type Params = { params: Promise<{ id: string }> }
-
-async function getProjectWithWorkspaceId(projectId: string) {
-  return prisma.project.findUnique({
-    where: { id: projectId },
-    include: { workspace: { select: { id: true } } },
-  })
-}
 
 export async function GET(request: Request, { params }: Params) {
   try {
     const { sub: userId } = await requireAuth(request)
     const { id } = await params
 
-    const project = await getProjectWithWorkspaceId(id)
+    const project = await prisma.project.findUnique({ where: { id } })
     if (!project) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
 
-    // Any member can view project
-    await requireWorkspaceRole(userId, project.workspace.id, 'member')
+    // User can only view their own projects
+    if (project.userId !== userId) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
 
     return NextResponse.json({
       id: project.id,
-      workspace_id: project.workspaceId,
+      user_id: project.userId,
       name: project.name,
       description: project.description,
       start_date: formatDate(project.startDate),
@@ -49,13 +43,15 @@ export async function PATCH(request: Request, { params }: Params) {
     const { sub: userId } = await requireAuth(request)
     const { id } = await params
 
-    const project = await getProjectWithWorkspaceId(id)
+    const project = await prisma.project.findUnique({ where: { id } })
     if (!project) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
 
-    // Must be admin or owner to edit
-    await requireWorkspaceRole(userId, project.workspace.id, 'admin')
+    // User can only edit their own projects
+    if (project.userId !== userId) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
 
     const body = await request.json()
     const update: {
@@ -81,7 +77,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const updated = await prisma.project.update({ where: { id }, data: update })
     return NextResponse.json({
       id: updated.id,
-      workspace_id: updated.workspaceId,
+      user_id: updated.userId,
       name: updated.name,
       description: updated.description,
       start_date: formatDate(updated.startDate),
@@ -102,13 +98,15 @@ export async function DELETE(request: Request, { params }: Params) {
     const { sub: userId } = await requireAuth(request)
     const { id } = await params
 
-    const project = await getProjectWithWorkspaceId(id)
+    const project = await prisma.project.findUnique({ where: { id } })
     if (!project) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
     }
 
-    // Must be owner to delete
-    await requireWorkspaceRole(userId, project.workspace.id, 'owner')
+    // User can only delete their own projects
+    if (project.userId !== userId) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
 
     await prisma.project.delete({ where: { id } })
     return new Response(null, { status: 204 })

@@ -75,7 +75,6 @@ export function DashboardSidebar() {
         </div>
         <nav className="flex-1 space-y-5 overflow-y-auto p-3">
           <div className="space-y-1">
-            <p className="px-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workspace</p>
             {coreNav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (

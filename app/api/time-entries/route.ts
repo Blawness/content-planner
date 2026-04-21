@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
-import { getUserWorkspaceIds } from '@/lib/rbac';
 
 export async function GET(request: Request) {
   try {
@@ -13,13 +12,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'taskId is required' }, { status: 400 });
     }
 
-    // Only return time entries the user owns (privacy: each member sees their own)
-    const workspaceIds = await getUserWorkspaceIds(userId);
+    // Verify task belongs to user's project
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: { project: { select: { userId: true } } }
+    });
+
+    if (!task || task.project.userId !== userId) {
+      return NextResponse.json({ message: 'Task not found' }, { status: 404 });
+    }
+
+    // Get time entries for this task
     const timeEntries = await prisma.timeEntry.findMany({
       where: {
         taskId,
         userId,
-        task: { project: { workspaceId: { in: workspaceIds } } },
       },
       orderBy: { startTime: 'desc' },
     });
@@ -27,7 +34,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ timeEntries });
   } catch (e) {
     console.error("Error in get time-entries:", e);
-    if (e instanceof Response) return e; // Auth error
+    if (e instanceof Response) return e;
     return NextResponse.json(
       { message: e instanceof Error ? e.message : 'Internal Server Error' },
       { status: 500 }
@@ -45,13 +52,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'taskId and startTime are required' }, { status: 400 });
     }
 
-    // Verify user is a member of the task's workspace
-    const workspaceIds = await getUserWorkspaceIds(userId);
+    // Verify task belongs to user's project
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      include: { project: { select: { workspaceId: true } } },
+      include: { project: { select: { userId: true } } }
     });
-    if (!task || !workspaceIds.includes(task.project.workspaceId)) {
+
+    if (!task || task.project.userId !== userId) {
       return NextResponse.json({ message: 'Task not found' }, { status: 404 });
     }
 
@@ -59,7 +66,6 @@ export async function POST(request: Request) {
     const end = endTime ? new Date(endTime) : null;
     let computedDuration = duration;
 
-    // Auto-compute duration in minutes if not provided but both times exist
     if (end && !computedDuration) {
       computedDuration = Math.round((end.getTime() - start.getTime()) / 60000);
     }
@@ -77,7 +83,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ timeEntry: newEntry });
   } catch (e) {
     console.error("Error in post time-entries:", e);
-    if (e instanceof Response) return e; // Auth error
+    if (e instanceof Response) return e;
     return NextResponse.json(
       { message: e instanceof Error ? e.message : 'Internal Server Error' },
       { status: 500 }
