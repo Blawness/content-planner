@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         isAdmin: true,
         createdAt: true,
         _count: {
-          select: { ownedWorkspaces: true, aiRequests: true },
+          select: { aiRequests: true },
         },
       },
     })
@@ -34,7 +34,6 @@ export async function GET(request: Request) {
         is_superuser: u.isSuperuser,
         is_admin: u.isAdmin,
         role: u.isSuperuser ? 'superuser' : u.isAdmin ? 'admin' : 'user',
-        owned_workspaces: u._count.ownedWorkspaces,
         ai_requests: u._count.aiRequests,
         created_at: u.createdAt.toISOString(),
       }))
@@ -93,7 +92,7 @@ export async function POST(request: Request) {
         isSuperuser: true,
         isAdmin: true,
         createdAt: true,
-        _count: { select: { ownedWorkspaces: true, aiRequests: true } },
+        _count: { select: { aiRequests: true } },
       },
     })
 
@@ -104,7 +103,6 @@ export async function POST(request: Request) {
         is_superuser: user.isSuperuser,
         is_admin: user.isAdmin,
         role: user.isSuperuser ? 'superuser' : user.isAdmin ? 'admin' : 'user',
-        owned_workspaces: user._count.ownedWorkspaces,
         ai_requests: user._count.aiRequests,
         created_at: user.createdAt.toISOString(),
       },
