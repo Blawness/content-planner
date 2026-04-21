@@ -21,12 +21,11 @@ function rowToResponse(item: ContentPlanItem) {
   }
 }
 
-// GET — fetch all items for current user
+// GET — fetch all content plan items for all users
 export async function GET(request: NextRequest) {
   try {
-    const { sub: userId } = await requireAuth(request)
+    await requireAuth(request)
     const items = await prisma.contentPlanItem.findMany({
-      where: { userId },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     })
     return NextResponse.json(items.map(rowToResponse))
