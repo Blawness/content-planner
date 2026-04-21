@@ -59,32 +59,20 @@ async function main() {
     },
   })
 
-  // ─── Create workspace with members ──────────────────────────────────────────
-  await prisma.workspace.create({
+  // ─── Create project for owner ───────────────────────────────────────────────────
+  await prisma.project.create({
     data: {
-      name: 'Beta Release Workspace',
-      ownerId: owner.id,
-      members: {
+      userId: owner.id,
+      name: 'AI Content Planner',
+      description: 'Getting the product ready for beta release',
+      tasks: {
         create: [
-          { userId: owner.id, role: 'owner' },
-          { userId: adminUser.id, role: 'admin' },
-          { userId: memberUser.id, role: 'member' },
+          { title: 'Setup Neon DB connection', status: 'DONE', assigneeId: owner.id },
+          { title: 'Create Prisma seed script', status: 'DONE', assigneeId: owner.id },
+          { title: 'Migrate middleware to proxy', status: 'DONE', assigneeId: owner.id },
+          { title: 'Integrate frontend with new APIs', status: 'IN_PROGRESS', assigneeId: adminUser.id },
+          { title: 'Test generated content formats', status: 'BACKLOG', assigneeId: memberUser.id },
         ],
-      },
-      projects: {
-        create: {
-          name: 'AI Content Planner',
-          description: 'Getting the product ready for beta release',
-          tasks: {
-            create: [
-              { title: 'Setup Neon DB connection', status: 'DONE', assigneeId: owner.id },
-              { title: 'Create Prisma seed script', status: 'DONE', assigneeId: owner.id },
-              { title: 'Migrate middleware to proxy', status: 'DONE', assigneeId: owner.id },
-              { title: 'Integrate frontend with new APIs', status: 'IN_PROGRESS', assigneeId: adminUser.id },
-              { title: 'Test generated content formats', status: 'BACKLOG', assigneeId: memberUser.id },
-            ],
-          },
-        },
       },
     },
   })
