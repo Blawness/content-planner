@@ -28,10 +28,14 @@ type AppSettings = {
   ai_enabled: string
 }
 
+type UserRole = 'superuser' | 'admin' | 'user'
+
 type AdminUser = {
   id: string
   email: string
   is_superuser: boolean
+  is_admin: boolean
+  role: UserRole
   owned_workspaces: number
   ai_requests: number
   created_at: string
@@ -50,8 +54,20 @@ const OPENROUTER_MODELS = [
   { value: 'mistralai/mistral-small-3.1-24b-instruct', label: 'Mistral Small 3.1 24B' },
 ]
 
-type CreateForm = { email: string; password: string; is_superuser: boolean }
-type EditForm = { email: string; password: string; is_superuser: boolean }
+const ROLE_BADGE: Record<UserRole, string> = {
+  superuser: 'bg-destructive/15 text-destructive',
+  admin:     'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  user:      'bg-muted text-muted-foreground',
+}
+
+const ROLE_LABEL: Record<UserRole, string> = {
+  superuser: 'Superuser',
+  admin:     'Admin',
+  user:      'User',
+}
+
+type CreateForm = { email: string; password: string; role: 'admin' | 'user' }
+type EditForm   = { email: string; password: string; role: 'admin' | 'user' }
 
 export default function AdminPage() {
   const router = useRouter()
@@ -69,13 +85,13 @@ export default function AdminPage() {
   // Create user modal
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [createForm, setCreateForm] = useState<CreateForm>({ email: '', password: '', is_superuser: false })
+  const [createForm, setCreateForm] = useState<CreateForm>({ email: '', password: '', role: 'user' })
   const [createErr, setCreateErr] = useState('')
 
   // Edit user modal
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [saving, setSaving] = useState(false)
-  const [editForm, setEditForm] = useState<EditForm>({ email: '', password: '', is_superuser: false })
+  const [editForm, setEditForm] = useState<EditForm>({ email: '', password: '', role: 'user' })
   const [editErr, setEditErr] = useState('')
 
   useEffect(() => {
@@ -131,7 +147,7 @@ export default function AdminPage() {
   }
 
   function openCreateModal() {
-    setCreateForm({ email: '', password: '', is_superuser: false })
+    setCreateForm({ email: '', password: '', role: 'user' })
     setCreateErr('')
     setShowCreate(true)
   }
@@ -157,7 +173,8 @@ export default function AdminPage() {
   }
 
   function openEditModal(targetUser: AdminUser) {
-    setEditForm({ email: targetUser.email, password: '', is_superuser: targetUser.is_superuser })
+    const role: 'admin' | 'user' = targetUser.is_admin ? 'admin' : 'user'
+    setEditForm({ email: targetUser.email, password: '', role })
     setEditErr('')
     setEditingUser(targetUser)
   }
@@ -168,7 +185,7 @@ export default function AdminPage() {
     setSaving(true)
     setEditErr('')
     try {
-      const body: Record<string, unknown> = { is_superuser: editForm.is_superuser }
+      const body: Record<string, unknown> = { role: editForm.role }
       if (editForm.email !== editingUser.email) body.email = editForm.email
       if (editForm.password) body.password = editForm.password
 
@@ -306,7 +323,10 @@ export default function AdminPage() {
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
                   <CardTitle>Users</CardTitle>
-                  <CardDescription>Buat akun baru, edit data user, atau hapus akun yang sudah tidak dipakai. Registrasi publik dinonaktifkan.</CardDescription>
+                  <CardDescription>
+                    Buat akun baru atau edit data user. Registrasi publik dinonaktifkan.
+                    Role <strong>Superuser</strong> hanya bisa diatur via console/DB.
+                  </CardDescription>
                 </div>
                 <Button type="button" onClick={openCreateModal} className="shrink-0">
                   + Buat User
@@ -332,12 +352,8 @@ export default function AdminPage() {
                           {targetUser.id === user.id ? <span className="ml-2 text-xs text-muted-foreground">(kamu)</span> : null}
                         </td>
                         <td className="py-3 pr-4">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            targetUser.is_superuser
-                              ? 'bg-destructive/15 text-destructive'
-                              : 'bg-muted text-muted-foreground'
-                          }`}>
-                            {targetUser.is_superuser ? 'Superuser' : 'User'}
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_BADGE[targetUser.role]}`}>
+                            {ROLE_LABEL[targetUser.role]}
                           </span>
                         </td>
                         <td className="py-3 pr-4">{targetUser.owned_workspaces}</td>
@@ -345,10 +361,16 @@ export default function AdminPage() {
                         <td className="py-3 pr-4">{new Date(targetUser.created_at).toLocaleDateString('id-ID')}</td>
                         <td className="py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => openEditModal(targetUser)}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditModal(targetUser)}
+                              disabled={targetUser.is_superuser && targetUser.id !== user.id}
+                            >
                               Edit
                             </Button>
-                            {targetUser.id !== user.id ? (
+                            {targetUser.id !== user.id && !targetUser.is_superuser ? (
                               <Button type="button" variant="destructive" size="sm" onClick={() => handleDeleteUser(targetUser)}>
                                 Hapus
                               </Button>
@@ -409,15 +431,20 @@ export default function AdminPage() {
                 onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
               />
             </div>
-            <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">Superuser</p>
-                <p className="text-xs text-muted-foreground">Berikan akses penuh ke admin panel.</p>
-              </div>
-              <Switch
-                checked={createForm.is_superuser}
-                onCheckedChange={(v) => setCreateForm((f) => ({ ...f, is_superuser: v }))}
-              />
+            <div className="space-y-2">
+              <Label htmlFor="create-role">Role</Label>
+              <Select
+                value={createForm.role}
+                onValueChange={(v) => setCreateForm((f) => ({ ...f, role: v as 'admin' | 'user' }))}
+              >
+                <SelectTrigger id="create-role" className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowCreate(false)} disabled={creating}>
@@ -468,20 +495,20 @@ export default function AdminPage() {
                 onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
               />
             </div>
-            <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">Superuser</p>
-                <p className="text-xs text-muted-foreground">
-                  {editingUser?.id === user?.id
-                    ? 'Kamu tidak bisa mencabut status superuser milikmu sendiri.'
-                    : 'Berikan atau cabut akses admin panel.'}
-                </p>
-              </div>
-              <Switch
-                checked={editForm.is_superuser}
-                disabled={editingUser?.id === user?.id}
-                onCheckedChange={(v) => setEditForm((f) => ({ ...f, is_superuser: v }))}
-              />
+            <div className="space-y-2">
+              <Label htmlFor="edit-role">Role</Label>
+              <Select
+                value={editForm.role}
+                onValueChange={(v) => setEditForm((f) => ({ ...f, role: v as 'admin' | 'user' }))}
+              >
+                <SelectTrigger id="edit-role" className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditingUser(null)} disabled={saving}>

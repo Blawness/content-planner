@@ -26,7 +26,6 @@ export async function PATCH(request: Request, { params }: Params) {
       )
     }
 
-    // Prevent superuser from revoking their own superuser status
     if (userId === callerId && !body.is_superuser) {
       return NextResponse.json(
         { message: 'You cannot revoke your own superuser status' },
@@ -37,13 +36,15 @@ export async function PATCH(request: Request, { params }: Params) {
     const updated = await prisma.user.update({
       where: { id: userId },
       data: { isSuperuser: body.is_superuser },
-      select: { id: true, email: true, isSuperuser: true, createdAt: true },
+      select: { id: true, email: true, isSuperuser: true, isAdmin: true, createdAt: true },
     })
 
     return NextResponse.json({
       id: updated.id,
       email: updated.email,
       is_superuser: updated.isSuperuser,
+      is_admin: updated.isAdmin,
+      role: updated.isSuperuser ? 'superuser' : updated.isAdmin ? 'admin' : 'user',
       created_at: updated.createdAt.toISOString(),
     })
   } catch (e) {
@@ -57,8 +58,8 @@ export async function PATCH(request: Request, { params }: Params) {
 
 /**
  * PUT /api/admin/users/[userId]
- * Edit user email and/or password. Superuser only.
- * Body: { email?: string; password?: string; is_superuser?: boolean }
+ * Edit user email, password, and/or role. Superuser only.
+ * Body: { email?: string; password?: string; role?: "admin" | "user" }
  */
 export async function PUT(request: Request, { params }: Params) {
   try {
@@ -88,14 +89,8 @@ export async function PUT(request: Request, { params }: Params) {
       data.passwordHash = await bcrypt.hash(body.password, 10)
     }
 
-    if (typeof body.is_superuser === 'boolean') {
-      if (userId === callerId && !body.is_superuser) {
-        return NextResponse.json(
-          { message: 'Kamu tidak bisa mencabut status superuser milikmu sendiri' },
-          { status: 400 }
-        )
-      }
-      data.isSuperuser = body.is_superuser
+    if (body.role === 'admin' || body.role === 'user') {
+      data.isAdmin = body.role === 'admin'
     }
 
     if (Object.keys(data).length === 0) {
@@ -109,6 +104,7 @@ export async function PUT(request: Request, { params }: Params) {
         id: true,
         email: true,
         isSuperuser: true,
+        isAdmin: true,
         createdAt: true,
         _count: { select: { ownedWorkspaces: true, aiRequests: true } },
       },
@@ -118,6 +114,8 @@ export async function PUT(request: Request, { params }: Params) {
       id: updated.id,
       email: updated.email,
       is_superuser: updated.isSuperuser,
+      is_admin: updated.isAdmin,
+      role: updated.isSuperuser ? 'superuser' : updated.isAdmin ? 'admin' : 'user',
       owned_workspaces: updated._count.ownedWorkspaces,
       ai_requests: updated._count.aiRequests,
       created_at: updated.createdAt.toISOString(),

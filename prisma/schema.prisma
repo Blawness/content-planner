@@ -23,6 +23,7 @@ model User {
   passwordHash String    @map("password_hash")
   // superuser = platform-level admin, manages all settings & users
   isSuperuser  Boolean   @default(false) @map("is_superuser")
+  isAdmin      Boolean   @default(false) @map("is_admin")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   ownedWorkspaces  Workspace[]       @relation("WorkspaceOwner")

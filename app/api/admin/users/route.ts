@@ -6,7 +6,7 @@ import { requireSuperuser } from '@/lib/rbac'
 
 /**
  * GET /api/admin/users
- * Returns all users with their superuser status. Superuser only.
+ * Returns all users. Superuser only.
  */
 export async function GET(request: Request) {
   try {
@@ -19,6 +19,7 @@ export async function GET(request: Request) {
         id: true,
         email: true,
         isSuperuser: true,
+        isAdmin: true,
         createdAt: true,
         _count: {
           select: { ownedWorkspaces: true, aiRequests: true },
@@ -31,6 +32,8 @@ export async function GET(request: Request) {
         id: u.id,
         email: u.email,
         is_superuser: u.isSuperuser,
+        is_admin: u.isAdmin,
+        role: u.isSuperuser ? 'superuser' : u.isAdmin ? 'admin' : 'user',
         owned_workspaces: u._count.ownedWorkspaces,
         ai_requests: u._count.aiRequests,
         created_at: u.createdAt.toISOString(),
@@ -48,7 +51,7 @@ export async function GET(request: Request) {
 /**
  * POST /api/admin/users
  * Create a new user. Superuser only.
- * Body: { email: string; password: string; is_superuser?: boolean }
+ * Body: { email: string; password: string; role: "admin" | "user" }
  */
 export async function POST(request: Request) {
   try {
@@ -58,7 +61,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
     const password = typeof body.password === 'string' ? body.password : ''
-    const isSuperuser = body.is_superuser === true
+    const role = body.role === 'admin' ? 'admin' : 'user'
 
     if (!email || !password) {
       return NextResponse.json(
@@ -83,11 +86,12 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(password, 10)
     const user = await prisma.user.create({
-      data: { email, passwordHash, isSuperuser },
+      data: { email, passwordHash, isAdmin: role === 'admin' },
       select: {
         id: true,
         email: true,
         isSuperuser: true,
+        isAdmin: true,
         createdAt: true,
         _count: { select: { ownedWorkspaces: true, aiRequests: true } },
       },
@@ -98,6 +102,8 @@ export async function POST(request: Request) {
         id: user.id,
         email: user.email,
         is_superuser: user.isSuperuser,
+        is_admin: user.isAdmin,
+        role: user.isSuperuser ? 'superuser' : user.isAdmin ? 'admin' : 'user',
         owned_workspaces: user._count.ownedWorkspaces,
         ai_requests: user._count.aiRequests,
         created_at: user.createdAt.toISOString(),
