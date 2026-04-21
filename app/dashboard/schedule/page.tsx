@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import { format, isValid, parse } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { CalendarClock, CheckCheck, ChevronDown, Keyboard, PencilLine, Sparkles, Trash2, WandSparkles } from 'lucide-react'
+import { CalendarClock, CheckCheck, ChevronDown, Keyboard, PencilLine, Plus, Sparkles, Trash2, WandSparkles } from 'lucide-react'
 
 import type { ContentPlanRow } from '@/types'
 import { useAuth } from '@/components/providers/AuthProvider'
@@ -169,6 +169,11 @@ export default function SchedulePage() {
   const [savingRow, setSavingRow] = useState(false)
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
+  const [showWeekLabelPicker, setShowWeekLabelPicker] = useState(false)
+  const [editingWeekLabel, setEditingWeekLabel] = useState<string | null>(null)
+  const [weekRange, setWeekRange] = useState<[Date | null, Date | null]>([null, null])
+  const [savingWeekLabel, setSavingWeekLabel] = useState(false)
+
   const [wizardStep, setWizardStep] = useState(0)
   const [selectedPresetId, setSelectedPresetId] = useState(AI_PRESETS[0].id)
   const [contentPerWeek, setContentPerWeek] = useState(AI_PRESETS[0].defaults.contentPerWeek)
@@ -312,12 +317,50 @@ export default function SchedulePage() {
     setSelectedPreviewIds([])
   }, [])
 
-  const openCreateModal = useCallback(() => {
+  const openCreateModalForWeek = useCallback((weekLabel = '') => {
     setEditingIndex(null)
-    setFormRow(EMPTY_ROW)
+    setFormRow({ ...EMPTY_ROW, week_label: weekLabel })
     setFormError('')
     setShowCrudModal(true)
   }, [])
+
+  function parseWeekLabel(label: string) {
+    const m = label.match(/^Minggu\s+(\d+)\s+-\s+(\d{2}\/\d{2}\/\d{4})\s+-\s+(\d{2}\/\d{2}\/\d{4})/)
+    if (!m) return null
+    const start = parse(m[2], 'dd/MM/yyyy', new Date())
+    const end = parse(m[3], 'dd/MM/yyyy', new Date())
+    return isValid(start) && isValid(end) ? { weekNum: m[1], start, end } : null
+  }
+
+  function buildWeekLabel(weekNum: string, start: Date, end: Date) {
+    return `Minggu ${weekNum} - ${format(start, 'dd/MM/yyyy')} - ${format(end, 'dd/MM/yyyy')}`
+  }
+
+  function openWeekLabelPicker(label: string) {
+    const parsed = parseWeekLabel(label)
+    setWeekRange(parsed ? [parsed.start, parsed.end] : [null, null])
+    setEditingWeekLabel(label)
+    setShowWeekLabelPicker(true)
+  }
+
+  async function handleApplyWeekLabel() {
+    if (!editingWeekLabel || !weekRange[0] || !weekRange[1] || !token) return
+    const parsed = parseWeekLabel(editingWeekLabel)
+    const newLabel = buildWeekLabel(parsed?.weekNum ?? '1', weekRange[0], weekRange[1])
+    if (newLabel === editingWeekLabel) { setShowWeekLabelPicker(false); setEditingWeekLabel(null); return }
+    setSavingWeekLabel(true)
+    try {
+      const targets = rows.filter((r) => r.week_label === editingWeekLabel)
+      await Promise.all(targets.map((r) => updateContentPlanItem(r.id!, { ...r, week_label: newLabel }, token)))
+      setRows((prev) => prev.map((r) => r.week_label === editingWeekLabel ? { ...r, week_label: newLabel } : r))
+    } catch (err) {
+      setPageError(err instanceof Error ? err.message : 'Gagal memperbarui label minggu')
+    } finally {
+      setSavingWeekLabel(false)
+      setShowWeekLabelPicker(false)
+      setEditingWeekLabel(null)
+    }
+  }
 
   useEffect(() => {
     if (!token) return
@@ -331,14 +374,14 @@ export default function SchedulePage() {
   useEffect(() => {
     const compose = searchParams.get('compose')
     if (compose === 'manual') {
-      openCreateModal()
+      openCreateModalForWeek()
       router.replace('/dashboard/schedule', { scroll: false })
     }
     if (compose === 'ai') {
       openAiWizard()
       router.replace('/dashboard/schedule', { scroll: false })
     }
-  }, [openAiWizard, openCreateModal, router, searchParams])
+  }, [openAiWizard, openCreateModalForWeek, router, searchParams])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -718,7 +761,7 @@ export default function SchedulePage() {
         description="Satu source of truth untuk ide, AI generate, jadwal publish, dan detail setiap konten. Preview AI tidak akan tersimpan sebelum Anda konfirmasi."
         actions={
           <>
-            <Button type="button" variant="outline" onClick={openCreateModal}>
+            <Button type="button" variant="outline" onClick={() => openCreateModalForWeek()}>
               <PencilLine className="size-4" />
               Tambah Manual
             </Button>
@@ -741,7 +784,7 @@ export default function SchedulePage() {
           description="Mulai dari AI Wizard jika Anda ingin generate draft cepat dengan preset, atau tambah manual jika struktur kontennya sudah siap."
           action={
             <>
-              <Button type="button" variant="outline" onClick={openCreateModal}>
+              <Button type="button" variant="outline" onClick={() => openCreateModalForWeek()}>
                 Tambah Manual
               </Button>
               <Button type="button" onClick={() => openAiWizard()}>
@@ -760,12 +803,33 @@ export default function SchedulePage() {
             return (
               <Card key={weekLabel} className="overflow-hidden">
                 <CardHeader className="border-b border-border bg-muted/40">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <CardTitle>{weekLabel}</CardTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        className="text-left"
+                        onClick={() => openWeekLabelPicker(weekLabel)}
+                        title="Klik untuk ubah rentang tanggal"
+                      >
+                        <CardTitle className="decoration-dashed underline-offset-4 hover:underline">
+                          {weekLabel}
+                        </CardTitle>
+                      </button>
                       <CardDescription>{weekRows.length} item konten</CardDescription>
                     </div>
-                    <Badge variant="secondary">{weekRows[0]?.status ?? 'Planned'}</Badge>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge variant="secondary">{weekRows[0]?.status ?? 'Planned'}</Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="size-8"
+                        title="Tambah item ke minggu ini"
+                        onClick={() => openCreateModalForWeek(weekLabel)}
+                      >
+                        <Plus className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">{renderRows(weekRows)}</CardContent>
@@ -774,6 +838,50 @@ export default function SchedulePage() {
           })}
         </div>
       ) : null}
+
+      <Dialog
+        open={showWeekLabelPicker}
+        onOpenChange={(open) => {
+          if (!open) { setShowWeekLabelPicker(false); setEditingWeekLabel(null) }
+        }}
+      >
+        <DialogContent className="w-auto max-w-fit p-0" showCloseButton={false}>
+          <div className="border-b border-border px-5 py-4">
+            <DialogHeader>
+              <DialogTitle>Ubah Rentang Tanggal Minggu</DialogTitle>
+              <DialogDescription>Pilih tanggal mulai dan akhir untuk label minggu ini.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="px-5 py-4">
+            <DatePicker
+              selectsRange
+              startDate={weekRange[0]}
+              endDate={weekRange[1]}
+              onChange={(range) => setWeekRange(range as [Date | null, Date | null])}
+              monthsShown={2}
+              inline
+              locale={localeId}
+              dateFormat="dd/MM/yyyy"
+            />
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setShowWeekLabelPicker(false); setEditingWeekLabel(null) }}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              disabled={!weekRange[0] || !weekRange[1] || savingWeekLabel}
+              onClick={() => void handleApplyWeekLabel()}
+            >
+              {savingWeekLabel ? 'Menyimpan...' : 'Terapkan'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showCrudModal} onOpenChange={(nextOpen) => (!nextOpen ? handleCancelCrudModal() : setShowCrudModal(true))}>
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto p-0 sm:max-w-4xl" showCloseButton={false}>
