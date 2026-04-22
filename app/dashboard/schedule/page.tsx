@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DatePicker from 'react-datepicker'
-import { format, isValid, parse } from 'date-fns'
+import { addDays, endOfWeek, format, isValid, parse, startOfWeek } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { Brain, CalendarClock, CheckCheck, ChevronDown, Keyboard, PencilLine, Plus, Sparkles, Trash2, WandSparkles } from 'lucide-react'
+import { Brain, CalendarClock, CheckCheck, ChevronDown, PencilLine, Plus, Sparkles, Trash2, WandSparkles } from 'lucide-react'
 import Link from 'next/link'
 
 import type { ContentPlanRow } from '@/types'
@@ -116,6 +116,61 @@ function formatUiDate(date: Date) {
 function getUiDay(date: Date) {
   const label = format(date, 'EEEE', { locale: localeId })
   return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+// Indonesian month names as produced by date-fns localeId
+const MONTH_NAMES_ID = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+]
+
+// Week number within the month: week 1 = the Mon–Sun that contains the 1st of the month
+function getWeekOfMonth(weekMonday: Date): number {
+  const firstOfMonth = new Date(weekMonday.getFullYear(), weekMonday.getMonth(), 1)
+  const firstWeekMonday = startOfWeek(firstOfMonth, { weekStartsOn: 1 })
+  const diffDays = Math.round((weekMonday.getTime() - firstWeekMonday.getTime()) / 86_400_000)
+  return Math.floor(diffDays / 7) + 1
+}
+
+function buildWeekLabel(weekMonday: Date): string {
+  const weekNum = getWeekOfMonth(weekMonday)
+  const monthLabel = format(weekMonday, 'MMMM yyyy', { locale: localeId })
+  return `Minggu ${weekNum} - ${monthLabel}`
+}
+
+function parseWeekLabel(label: string) {
+  // New format: "Minggu 4 - April 2026"
+  const newMatch = label.match(/^Minggu\s+(\d+)\s+-\s+(\w+)\s+(\d{4})$/)
+  if (newMatch) {
+    const weekNum = parseInt(newMatch[1])
+    const monthIndex = MONTH_NAMES_ID.indexOf(newMatch[2])
+    const year = parseInt(newMatch[3])
+    if (monthIndex === -1 || isNaN(weekNum) || isNaN(year)) return null
+    const firstWeekMonday = startOfWeek(new Date(year, monthIndex, 1), { weekStartsOn: 1 })
+    const weekStart = addDays(firstWeekMonday, (weekNum - 1) * 7)
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 })
+    return { weekNum: String(weekNum), start: weekStart, end: weekEnd }
+  }
+  // Old format: "Minggu 1 - 22/04/2026 - 24/04/2026"
+  const oldMatch = label.match(/^Minggu\s+(\d+)\s+-\s+(\d{2}\/\d{2}\/\d{4})\s+-\s+(\d{2}\/\d{2}\/\d{4})/)
+  if (oldMatch) {
+    const start = parse(oldMatch[2], 'dd/MM/yyyy', new Date())
+    const end = parse(oldMatch[3], 'dd/MM/yyyy', new Date())
+    return isValid(start) && isValid(end) ? { weekNum: oldMatch[1], start, end } : null
+  }
+  return null
+}
+
+function detectWeekLabel(date: Date, existingRows: ContentPlanRow[]): string {
+  // If date already belongs to an existing week group, keep that label
+  for (const row of existingRows) {
+    const parsed = parseWeekLabel(row.week_label ?? '')
+    if (!parsed) continue
+    if (date >= parsed.start && date <= parsed.end) return row.week_label!
+  }
+  // New week — derive label from week-of-month
+  const weekMonday = startOfWeek(date, { weekStartsOn: 1 })
+  return buildWeekLabel(weekMonday)
 }
 
 function sortRows<T extends ContentPlanRow>(rows: T[]) {
@@ -331,18 +386,6 @@ export default function SchedulePage() {
     setShowCrudModal(true)
   }, [])
 
-  function parseWeekLabel(label: string) {
-    const m = label.match(/^Minggu\s+(\d+)\s+-\s+(\d{2}\/\d{2}\/\d{4})\s+-\s+(\d{2}\/\d{2}\/\d{4})/)
-    if (!m) return null
-    const start = parse(m[2], 'dd/MM/yyyy', new Date())
-    const end = parse(m[3], 'dd/MM/yyyy', new Date())
-    return isValid(start) && isValid(end) ? { weekNum: m[1], start, end } : null
-  }
-
-  function buildWeekLabel(weekNum: string, start: Date, end: Date) {
-    return `Minggu ${weekNum} - ${format(start, 'dd/MM/yyyy')} - ${format(end, 'dd/MM/yyyy')}`
-  }
-
   function openWeekLabelPicker(label: string) {
     const parsed = parseWeekLabel(label)
     setWeekRange(parsed ? [parsed.start, parsed.end] : [null, null])
@@ -351,9 +394,9 @@ export default function SchedulePage() {
   }
 
   async function handleApplyWeekLabel() {
-    if (!editingWeekLabel || !weekRange[0] || !weekRange[1] || !token) return
-    const parsed = parseWeekLabel(editingWeekLabel)
-    const newLabel = buildWeekLabel(parsed?.weekNum ?? '1', weekRange[0], weekRange[1])
+    if (!editingWeekLabel || !weekRange[0] || !token) return
+    const weekMonday = startOfWeek(weekRange[0], { weekStartsOn: 1 })
+    const newLabel = buildWeekLabel(weekMonday)
     if (newLabel === editingWeekLabel) { setShowWeekLabelPicker(false); setEditingWeekLabel(null); return }
     setSavingWeekLabel(true)
     try {
@@ -979,6 +1022,7 @@ export default function SchedulePage() {
                       }
                       handleFormRowChange('date', formatUiDate(date))
                       handleFormRowChange('day', getUiDay(date))
+                      handleFormRowChange('week_label', detectWeekLabel(date, rows))
                     }}
                     dateFormat="dd/MM/yyyy"
                     placeholderText="dd/mm/yyyy"
@@ -1114,20 +1158,6 @@ export default function SchedulePage() {
               </Alert>
             ) : null}
 
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col gap-3 py-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="font-medium">Shortcut keyboard</p>
-                  <p className="text-sm text-muted-foreground">Gunakan shortcut ini untuk review dan submit wizard lebih cepat.</p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1"><Keyboard className="size-3.5" />Ctrl/Cmd + Enter</span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1">Alt + ← / →</span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1">Shift + A</span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1">Shift + X</span>
-                </div>
-              </CardContent>
-            </Card>
 
             {wizardStep === 0 ? (
               <div className="space-y-5">

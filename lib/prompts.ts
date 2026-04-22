@@ -54,6 +54,7 @@ Each object represents ONE table row with these keys:
 
 Rules:
 - Use Bahasa Indonesia for all content text.
+- "week_label" format must be "Minggu X - MMMM YYYY" where X is the week-of-month number (week 1 = the Mon–Sun containing the 1st of the month). Example: "Minggu 4 - April 2026". Cross-month weeks use the month of the Monday. All items in the same Mon–Sun week must share the same week_label.
 - "date" format must be DD/MM/YYYY.
 - "day" must be Indonesian day name (Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu).
 - "format" should be one of: Single Post, Carousel, Reels.
@@ -66,7 +67,7 @@ Rules:
 Example (for 2 weeks, 2 posts per week = 4 items):
 [
   {
-    "week_label": "Minggu 1 - 17-20 April 2026 : Topik SHM",
+    "week_label": "Minggu 3 - April 2026",
     "date": "17/04/2026",
     "day": "Jumat",
     "topic": "SHM",
@@ -74,13 +75,13 @@ Example (for 2 weeks, 2 posts per week = 4 items):
     "headline": "SHM Turun-Temurun: Aman atau Perlu Diperbarui?",
     "visual_description": "Slide 1 cover, slide 2 definisi, slide 3 risiko, slide 4 CTA",
     "content_body": "Jelaskan definisi SHM, kapan wajib update data, dan langkah praktis mengecek keabsahan dokumen.",
-    "hook_caption": "Warisan tanah tanpa balik nama itu risiko. Yuk pahami aturan SHM supaya segara urus sebelum waris.",
+    "hook_caption": "Warisan tanah tanpa balik nama itu risiko. Yuk pahami aturan SHM supaya segera urus sebelum waris.",
     "scheduled_time": "10:00 WIB",
     "status": "To Do",
     "notes": "Baru"
   },
   {
-    "week_label": "Minggu 1 - 17-20 April 2026 : Topik SHM",
+    "week_label": "Minggu 3 - April 2026",
     "date": "19/04/2026",
     "day": "Minggu",
     "topic": "SHM",
