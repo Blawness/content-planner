@@ -52,8 +52,21 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
+        let isClosed = false;
+
         const sendEvent = (payload: Record<string, unknown>) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          if (isClosed) return;
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          } catch {
+            isClosed = true;
+          }
+        };
+
+        const safeClose = () => {
+          if (isClosed) return;
+          isClosed = true;
+          try { controller.close(); } catch {}
         };
 
         try {
@@ -72,7 +85,10 @@ export async function POST(request: NextRequest) {
               targetAudience,
             },
             {
-              callAi: async (prompt: string) => openRouterChat([{ role: 'user', content: prompt }], model),
+              callAi: async (prompt: string) => {
+                if (isClosed || request.signal.aborted) throw new Error('Stream cancelled');
+                return openRouterChat([{ role: 'user', content: prompt }], model);
+              },
               onProgress: (event) => {
                 sendEvent({
                   type: 'progress',
@@ -94,16 +110,20 @@ export async function POST(request: NextRequest) {
             message: `Selesai! Generated ${rows.length}/${totalItems} konten`,
           });
 
-          controller.close();
+          safeClose();
         } catch (error) {
-          console.error('Error in generate-schedule-stream:', error);
-          sendEvent({
-            type: 'error',
-            message: error instanceof Error ? error.message : 'Internal Server Error',
-          });
-          controller.close();
+          const isCancel = error instanceof Error && error.message === 'Stream cancelled';
+          if (!isCancel) {
+            console.error('Error in generate-schedule-stream:', error);
+            sendEvent({
+              type: 'error',
+              message: error instanceof Error ? error.message : 'Internal Server Error',
+            });
+          }
+          safeClose();
         }
       },
+      cancel() {},
     });
 
     return new NextResponse(stream, {

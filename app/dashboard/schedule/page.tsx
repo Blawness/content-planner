@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import { addDays, endOfWeek, format, isValid, parse, startOfWeek } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { Brain, CalendarClock, CheckCheck, ChevronDown, PencilLine, Plus, Sparkles, Trash2, WandSparkles } from 'lucide-react'
+import { Brain, CalendarClock, CheckCheck, ChevronDown, ClipboardCheck, Copy, PencilLine, Plus, Sparkles, Trash2, WandSparkles } from 'lucide-react'
 import Link from 'next/link'
 
 import type { ContentPlanRow } from '@/types'
@@ -37,7 +37,7 @@ const PLATFORMS = ['Instagram', 'TikTok', 'LinkedIn']
 const TONES = ['Edukatif', 'Promosi', 'Entertaining', 'Inspiratif', 'Story Telling']
 const FORMAT_OPTIONS = ['Single Post', 'Carousel', 'Reels']
 const STATUS_OPTIONS = ['To Do', 'In Review', 'Done']
-const WIZARD_STEPS = ['Preset', 'Konfigurasi', 'Preview']
+const WIZARD_STEPS = ['Setup', 'Preview']
 
 const AI_PRESETS = [
   {
@@ -48,7 +48,7 @@ const AI_PRESETS = [
       tone: 'Edukatif',
       contentIdea: 'Bangun awareness dengan edukasi sederhana dan topik yang mudah dibagikan.',
       contentPerWeek: 3,
-      durationWeeks: 2,
+      durationWeeks: 1,
     },
     examples: ['Mitos vs fakta', 'Kesalahan paling umum', 'FAQ singkat untuk pemula'],
   },
@@ -60,7 +60,7 @@ const AI_PRESETS = [
       tone: 'Entertaining',
       contentIdea: 'Aktifkan interaksi lewat opini, checklist, dan format yang mengundang respons.',
       contentPerWeek: 4,
-      durationWeeks: 2,
+      durationWeeks: 1,
     },
     examples: ['A atau B', 'Checklist mingguan', 'Cerita relatable dari audiens'],
   },
@@ -72,7 +72,7 @@ const AI_PRESETS = [
       tone: 'Promosi',
       contentIdea: 'Bangun minat menuju peluncuran produk dengan teaser, demo, dan CTA yang jelas.',
       contentPerWeek: 5,
-      durationWeeks: 3,
+      durationWeeks: 1,
     },
     examples: ['Teaser fitur utama', 'Before-after', 'Social proof dan CTA'],
   },
@@ -198,6 +198,28 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+function buildCopyText(row: ContentPlanRow): string {
+  const sep = '─'.repeat(40)
+  const lines: string[] = [
+    `${row.format.toUpperCase()} · ${row.topic}`,
+    `${row.date} · ${row.day} · ${row.scheduled_time}`,
+    sep,
+    '',
+    'HEADLINE',
+    row.headline || '-',
+    '',
+    'HOOK / CAPTION',
+    row.hook_caption || '-',
+    '',
+    'ISI KONTEN',
+    row.content_body || '-',
+    '',
+    'DESKRIPSI VISUAL',
+    row.visual_description || '-',
+  ]
+  return lines.join('\n')
+}
+
 function renderValidationList(items: string[]) {
   return (
     <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
@@ -237,7 +259,6 @@ export default function SchedulePage() {
   const [platform, setPlatform] = useState(PLATFORMS[0])
   const [niche, setNiche] = useState('')
   const [contentIdea, setContentIdea] = useState(AI_PRESETS[0].defaults.contentIdea)
-  const [monthLabel, setMonthLabel] = useState('')
   const [durationWeeks, setDurationWeeks] = useState(AI_PRESETS[0].defaults.durationWeeks)
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [tone, setTone] = useState(AI_PRESETS[0].defaults.tone)
@@ -253,12 +274,15 @@ export default function SchedulePage() {
   const [bulkStatus, setBulkStatus] = useState(STATUS_OPTIONS[0])
   const [bulkFormat, setBulkFormat] = useState(FORMAT_OPTIONS[0])
   const [bulkTime, setBulkTime] = useState('10:00 WIB')
+  const [copiedPreviewId, setCopiedPreviewId] = useState<string | null>(null)
+  const [copiedRowId, setCopiedRowId] = useState<string | null>(null)
   const isUnauthorized = !authLoading && !token
 
   const [businessContext, setBusinessContext] = useState<UserSettingData | null>(null)
   const [isRecommending, setIsRecommending] = useState(false)
   const [aiRecommendNote, setAiRecommendNote] = useState('')
   const appliedContextRef = useRef(false)
+  const autoGenerateRef = useRef(false)
 
   const pendingItemsRef = useRef<ContentPlanRow[]>([])
 
@@ -280,20 +304,11 @@ export default function SchedulePage() {
   const normalizedContentPerWeek = clampNumber(Math.trunc(contentPerWeek || 0), 1, 14)
   const normalizedDurationWeeks = clampNumber(Math.trunc(durationWeeks || 0), 1, 12)
   const estimatedCount = normalizedContentPerWeek * normalizedDurationWeeks
-  const step0BlockingIssues = useMemo(() => {
+  const setupBlockingIssues = useMemo(() => {
     const issues: string[] = []
     if (!selectedPresetId) issues.push('Pilih salah satu preset untuk memberi arah hasil AI.')
     if (!platform) issues.push('Pilih platform utama.')
     if (niche.trim().length < 3) issues.push('Isi niche minimal 3 karakter agar brief cukup jelas.')
-    return issues
-  }, [niche, platform, selectedPresetId])
-  const step0Hints = useMemo(() => {
-    const hints: string[] = []
-    if (!aiTargetAudience.trim()) hints.push('Target audience belum wajib, tetapi akan membantu AI membuat hook yang lebih tajam.')
-    return hints
-  }, [aiTargetAudience])
-  const step1BlockingIssues = useMemo(() => {
-    const issues: string[] = []
     if (!contentIdea.trim()) issues.push('Isi campaign atau angle utama sebelum membuat preview.')
     if (!tone) issues.push('Pilih tone konten.')
     if (!Number.isInteger(contentPerWeek) || contentPerWeek < 1 || contentPerWeek > 14) {
@@ -303,20 +318,20 @@ export default function SchedulePage() {
       issues.push('Durasi minggu harus antara 1 sampai 12.')
     }
     return issues
-  }, [contentIdea, contentPerWeek, durationWeeks, tone])
-  const step1Hints = useMemo(() => {
+  }, [niche, platform, selectedPresetId, contentIdea, contentPerWeek, durationWeeks, tone])
+  const setupHints = useMemo(() => {
     const hints: string[] = []
+    if (!aiTargetAudience.trim()) hints.push('Target audience belum wajib, tetapi akan membantu AI membuat hook yang lebih tajam.')
     if (!startDate) hints.push('Tanggal mulai kosong. AI tetap bisa berjalan, tetapi urutan tanggal akan lebih presisi jika diisi.')
     if (estimatedCount > 20) hints.push('Estimasi output cukup besar. Pertimbangkan preview bertahap agar review lebih cepat.')
     return hints
-  }, [estimatedCount, startDate])
+  }, [aiTargetAudience, startDate, estimatedCount])
   const selectedPreviewRows = useMemo(
     () => previewRows.filter((row) => selectedPreviewIds.includes(row.preview_id)),
     [previewRows, selectedPreviewIds]
   )
   const saveTargetRows = selectedPreviewRows.length > 0 ? selectedPreviewRows : previewRows
-  const canAdvanceToConfiguration = step0BlockingIssues.length === 0
-  const canGeneratePreview = step1BlockingIssues.length === 0 && !previewLoading
+  const canGeneratePreview = setupBlockingIssues.length === 0 && !previewLoading
   const canSavePreview = !previewLoading && !savingPreview && saveTargetRows.length > 0
 
   const setWizardDefaultsFromPreset = useCallback((presetId: string) => {
@@ -335,7 +350,6 @@ export default function SchedulePage() {
     setPlatform(PLATFORMS[0])
     setNiche('')
     setAiTargetAudience('')
-    setMonthLabel('')
     setStartDate(null)
     setReplaceExisting(false)
     setAiError('')
@@ -605,6 +619,7 @@ export default function SchedulePage() {
       if (rec.content_per_week) setContentPerWeek(rec.content_per_week)
       if (rec.duration_weeks) setDurationWeeks(rec.duration_weeks)
       if (rec.reasoning) setAiRecommendNote(rec.reasoning)
+      autoGenerateRef.current = true
       setWizardStep(1)
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Gagal mendapatkan rekomendasi AI')
@@ -619,7 +634,7 @@ export default function SchedulePage() {
     setPreviewRows([])
     setPreviewLoading(true)
     setSelectedPreviewIds([])
-    setWizardStep(2)
+    setWizardStep(1)
     setStreamProgress({ current: 0, total: 0 })
     setStreamMessage('')
     pendingItemsRef.current = []
@@ -631,7 +646,6 @@ export default function SchedulePage() {
           platform,
           niche,
           content_idea: contentIdea || undefined,
-          month_label: monthLabel || undefined,
           duration_weeks: normalizedDurationWeeks,
           start_date: startDate ? format(startDate, 'dd/MM/yyyy') : undefined,
           tone,
@@ -670,7 +684,7 @@ export default function SchedulePage() {
       setAiError(err instanceof Error ? err.message : 'Gagal membuat preview AI')
       setPreviewLoading(false)
     }
-  }, [aiTargetAudience, contentIdea, generateScheduleStream, monthLabel, niche, normalizedContentPerWeek, normalizedDurationWeeks, platform, startDate, token, tone])
+  }, [aiTargetAudience, contentIdea, generateScheduleStream, niche, normalizedContentPerWeek, normalizedDurationWeeks, platform, startDate, token, tone])
 
   const handleSavePreview = useCallback(async () => {
     if (!token || saveTargetRows.length === 0) return
@@ -693,6 +707,13 @@ export default function SchedulePage() {
   }, [closeAiWizard, replaceExisting, saveTargetRows, token])
 
   useEffect(() => {
+    if (wizardStep === 1 && autoGenerateRef.current) {
+      autoGenerateRef.current = false
+      void handlePreviewGenerate()
+    }
+  }, [wizardStep, handlePreviewGenerate])
+
+  useEffect(() => {
     if (!showAiModal) return
 
     function onKeyDown(event: KeyboardEvent) {
@@ -701,11 +722,9 @@ export default function SchedulePage() {
 
       if (hasPrimaryModifier && key === 'enter') {
         event.preventDefault()
-        if (wizardStep === 0 && canAdvanceToConfiguration) {
-          setWizardStep(1)
-        } else if (wizardStep === 1 && canGeneratePreview) {
+        if (wizardStep === 0 && canGeneratePreview) {
           void handlePreviewGenerate()
-        } else if (wizardStep === 2 && canSavePreview) {
+        } else if (wizardStep === 1 && canSavePreview) {
           void handleSavePreview()
         }
         return
@@ -719,21 +738,19 @@ export default function SchedulePage() {
 
       if (event.altKey && event.key === 'ArrowRight') {
         event.preventDefault()
-        if (wizardStep === 0 && canAdvanceToConfiguration) {
-          setWizardStep(1)
-        } else if (wizardStep === 1 && canGeneratePreview) {
+        if (wizardStep === 0 && canGeneratePreview) {
           void handlePreviewGenerate()
         }
         return
       }
 
-      if (wizardStep === 2 && event.shiftKey && key === 'a' && previewRows.length > 0) {
+      if (wizardStep === 1 && event.shiftKey && key === 'a' && previewRows.length > 0) {
         event.preventDefault()
         selectAllPreviewRows()
         return
       }
 
-      if (wizardStep === 2 && event.shiftKey && key === 'x') {
+      if (wizardStep === 1 && event.shiftKey && key === 'x') {
         event.preventDefault()
         clearPreviewSelection()
       }
@@ -742,7 +759,6 @@ export default function SchedulePage() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [
-    canAdvanceToConfiguration,
     canGeneratePreview,
     canSavePreview,
     clearPreviewSelection,
@@ -822,6 +838,24 @@ export default function SchedulePage() {
                 </div>
               </div>
               <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="sm:mr-auto"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(buildCopyText(row)).then(() => {
+                      const key = row.id ?? String(globalIndex)
+                      setCopiedRowId(key)
+                      setTimeout(() => setCopiedRowId(null), 2000)
+                    })
+                  }}
+                >
+                  {copiedRowId === (row.id ?? String(globalIndex)) ? (
+                    <><ClipboardCheck className="size-4" />Copied!</>
+                  ) : (
+                    <><Copy className="size-4" />Copy konten</>
+                  )}
+                </Button>
                 <Select value={row.status} onValueChange={(value) => void handleQuickStatusChange(globalIndex, value ?? STATUS_OPTIONS[0])}>
                   <SelectTrigger className="h-9 w-full sm:w-[180px]">
                     <SelectValue placeholder="Ubah status" />
@@ -1196,23 +1230,31 @@ export default function SchedulePage() {
                   </Alert>
                 )}
 
-                {step0BlockingIssues.length > 0 ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Lengkapi step ini dulu</AlertTitle>
-                    <AlertDescription>{renderValidationList(step0BlockingIssues)}</AlertDescription>
+                {aiRecommendNote ? (
+                  <Alert>
+                    <Brain className="size-4" />
+                    <AlertTitle>AI merekomendasikan konfigurasi ini</AlertTitle>
+                    <AlertDescription>{aiRecommendNote}</AlertDescription>
                   </Alert>
                 ) : null}
 
-                {step0Hints.length > 0 ? (
+                {setupBlockingIssues.length > 0 ? (
+                  <Alert variant="destructive">
+                    <AlertTitle>Lengkapi setup dulu</AlertTitle>
+                    <AlertDescription>{renderValidationList(setupBlockingIssues)}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                {setupHints.length > 0 ? (
                   <Alert>
-                    <AlertTitle>Context bisa dibuat lebih tajam</AlertTitle>
-                    <AlertDescription>{renderValidationList(step0Hints)}</AlertDescription>
+                    <AlertTitle>Tips sebelum generate</AlertTitle>
+                    <AlertDescription>{renderValidationList(setupHints)}</AlertDescription>
                   </Alert>
                 ) : null}
 
                 <FormSection
                   title="Pilih preset"
-                  description="Preset memberi starting point yang lebih cepat. Anda tetap bisa mengubah semua parameter di langkah berikutnya."
+                  description="Preset memberi starting point yang lebih cepat. Semua parameter di bawah masih bisa diubah."
                 >
                   <div className="grid gap-4 md:grid-cols-3">
                     {AI_PRESETS.map((preset) => {
@@ -1263,63 +1305,20 @@ export default function SchedulePage() {
                       </Select>
                     </FormField>
 
-                    <FormField
-                      label="Niche"
-                      htmlFor="aiNiche"
-                      required
-                      description="Contoh input: klinik gigi keluarga, skincare acne-prone, catering sehat untuk kantor."
-                    >
+                    <FormField label="Niche" htmlFor="aiNiche" required description="Contoh: klinik gigi keluarga, skincare acne-prone, catering sehat untuk kantor.">
                       <Input id="aiNiche" value={niche} onChange={(e) => setNiche(e.target.value)} className="h-10" />
                     </FormField>
 
-                    <FormField
-                      label="Target audience"
-                      htmlFor="aiAudience"
-                      description="Contoh: wanita 25-34 di kota besar, pemilik UMKM F&B, orang tua dengan anak balita."
-                      className="md:col-span-2"
-                    >
+                    <FormField label="Target audience" htmlFor="aiAudience" description="Contoh: wanita 25-34 di kota besar, pemilik UMKM F&B, orang tua dengan anak balita." className="md:col-span-2">
                       <Input id="aiAudience" value={aiTargetAudience} onChange={(e) => setAiTargetAudience(e.target.value)} className="h-10" />
                     </FormField>
                   </FormGrid>
                 </FormSection>
-              </div>
-            ) : null}
 
-            {wizardStep === 1 ? (
-              <div className="space-y-5">
-                {aiRecommendNote ? (
-                  <Alert>
-                    <Brain className="size-4" />
-                    <AlertTitle>AI merekomendasikan konfigurasi ini</AlertTitle>
-                    <AlertDescription>{aiRecommendNote}</AlertDescription>
-                  </Alert>
-                ) : null}
-
-                {step1BlockingIssues.length > 0 ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Konfigurasi belum siap</AlertTitle>
-                    <AlertDescription>{renderValidationList(step1BlockingIssues)}</AlertDescription>
-                  </Alert>
-                ) : null}
-
-                {step1Hints.length > 0 ? (
-                  <Alert>
-                    <AlertTitle>Rekomendasi sebelum generate</AlertTitle>
-                    <AlertDescription>{renderValidationList(step1Hints)}</AlertDescription>
-                  </Alert>
-                ) : null}
-
-                <FormSection title="Konfigurasi plan" description="Atur parameter sebelum AI membuat preview. Semua hasil di step berikutnya masih aman untuk direview dulu.">
-                  <FormField label="Preset aktif">
-                    <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
-                      <p className="font-medium">{selectedPreset.label}</p>
-                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{selectedPreset.summary}</p>
-                    </div>
-                  </FormField>
-
+                <FormSection title="Konfigurasi campaign" description="Atur campaign dan jadwal. Semua hasil preview masih aman untuk direview sebelum disimpan.">
                   <FormGrid>
-                    <FormField label="Campaign / angle utama" htmlFor="aiContentIdea" description="Boleh ubah suggestion bawaan preset jika Anda ingin angle yang lebih spesifik.">
-                      <Textarea id="aiContentIdea" value={contentIdea} onChange={(e) => setContentIdea(e.target.value)} rows={4} />
+                    <FormField label="Campaign / angle utama" htmlFor="aiContentIdea" description="Boleh ubah suggestion bawaan preset jika ingin angle yang lebih spesifik.">
+                      <Textarea id="aiContentIdea" value={contentIdea} onChange={(e) => setContentIdea(e.target.value)} rows={3} />
                     </FormField>
 
                     <FormField label="Tone konten">
@@ -1351,10 +1350,6 @@ export default function SchedulePage() {
                       />
                     </FormField>
 
-                    <FormField label="Label periode" htmlFor="aiMonthLabel">
-                      <Input id="aiMonthLabel" value={monthLabel} onChange={(e) => setMonthLabel(e.target.value)} placeholder="April 2026" className="h-10" />
-                    </FormField>
-
                     <FormField label="Konten per minggu" htmlFor="aiContentPerWeek">
                       <Input
                         id="aiContentPerWeek"
@@ -1367,9 +1362,7 @@ export default function SchedulePage() {
                         className="h-10"
                       />
                     </FormField>
-                  </FormGrid>
 
-                  <FormGrid className="md:grid-cols-[1fr_1fr_auto]">
                     <FormField label="Durasi (minggu)" htmlFor="aiDurationWeeks">
                       <Input
                         id="aiDurationWeeks"
@@ -1382,37 +1375,16 @@ export default function SchedulePage() {
                         className="h-10"
                       />
                     </FormField>
-
-                    <FormField label="Total estimasi output">
-                      <div className="flex h-10 items-center rounded-lg border border-border bg-muted/40 px-3 text-sm font-medium">
-                        {estimatedCount} konten
-                      </div>
-                    </FormField>
-
-                    <FormField label="Replace existing">
-                      <div className="flex h-10 items-center gap-3 rounded-lg border border-border px-3">
-                        <Switch checked={replaceExisting} onCheckedChange={setReplaceExisting} />
-                        <span className="text-sm text-muted-foreground">Hapus item lama saat save</span>
-                      </div>
-                    </FormField>
                   </FormGrid>
-                </FormSection>
 
-                <Card className="border-dashed">
-                  <CardHeader>
-                    <CardTitle className="text-base">Contoh arah hasil dari preset</CardTitle>
-                    <CardDescription>Preview akhir tetap dibuat oleh AI, tetapi contoh ini membantu Anda mengecek apakah preset dan niche sudah tepat.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-wrap gap-2">
-                    {selectedPreset.examples.map((example) => (
-                      <Badge key={example} variant="secondary">{example}</Badge>
-                    ))}
-                  </CardContent>
-                </Card>
+                  <div className="flex h-10 w-full max-w-[18rem] items-center rounded-lg border border-border bg-muted/40 px-3 text-sm font-medium text-muted-foreground">
+                    Estimasi output: <span className="ml-1 font-semibold text-foreground">{estimatedCount} konten</span>
+                  </div>
+                </FormSection>
               </div>
             ) : null}
 
-            {wizardStep === 2 ? (
+            {wizardStep === 1 ? (
               <div className="space-y-5">
                 <Card>
                   <CardHeader>
@@ -1597,6 +1569,29 @@ export default function SchedulePage() {
                                     <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{row.hook_caption}</p>
                                   </div>
                                 </div>
+                                <div className="mt-3 border-t border-border pt-3">
+                                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Isi Konten</p>
+                                  <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{row.content_body}</p>
+                                  <div className="mt-3 flex justify-end">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        void navigator.clipboard.writeText(buildCopyText(row)).then(() => {
+                                          setCopiedPreviewId(row.preview_id)
+                                          setTimeout(() => setCopiedPreviewId(null), 2000)
+                                        })
+                                      }}
+                                    >
+                                      {copiedPreviewId === row.preview_id ? (
+                                        <><ClipboardCheck className="size-4" />Copied!</>
+                                      ) : (
+                                        <><Copy className="size-4" />Copy konten</>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </CardContent>
@@ -1618,36 +1613,31 @@ export default function SchedulePage() {
                     type="button"
                     variant="outline"
                     onClick={() => void handleAiRecommend()}
-                    disabled={isRecommending || !canAdvanceToConfiguration}
+                    disabled={isRecommending}
                   >
                     <Brain className="size-4" />
                     {isRecommending ? 'AI sedang memilih...' : 'AI Pilihkan Campaign'}
                   </Button>
                 ) : null}
-                <Button type="button" onClick={() => setWizardStep(1)} disabled={!canAdvanceToConfiguration}>
-                  Atur Sendiri
+                <Button type="button" onClick={() => void handlePreviewGenerate()} disabled={!canGeneratePreview}>
+                  {previewLoading ? 'Menyiapkan preview...' : 'Buat Preview AI'}
                 </Button>
               </>
             ) : null}
 
             {wizardStep === 1 ? (
               <>
-                <Button type="button" variant="outline" onClick={() => setWizardStep(0)}>Kembali</Button>
-                <Button type="button" onClick={handlePreviewGenerate} disabled={!canGeneratePreview}>
-                  {previewLoading ? 'Menyiapkan preview...' : 'Buat Preview AI'}
+                <Button type="button" variant="outline" onClick={() => setWizardStep(0)} disabled={previewLoading || savingPreview}>
+                  Edit Setup
                 </Button>
-              </>
-            ) : null}
-
-            {wizardStep === 2 ? (
-              <>
-                <Button type="button" variant="outline" onClick={() => setWizardStep(1)} disabled={previewLoading || savingPreview}>
-                  Edit Konfigurasi
-                </Button>
-                <Button type="button" variant="outline" onClick={handlePreviewGenerate} disabled={previewLoading || savingPreview}>
+                <Button type="button" variant="outline" onClick={() => void handlePreviewGenerate()} disabled={previewLoading || savingPreview}>
                   Preview Ulang
                 </Button>
-                <Button type="button" onClick={handleSavePreview} disabled={!canSavePreview}>
+                <div className="flex items-center gap-2 rounded-lg border border-border px-3">
+                  <Switch checked={replaceExisting} onCheckedChange={setReplaceExisting} id="replaceExisting" />
+                  <label htmlFor="replaceExisting" className="cursor-pointer text-sm text-muted-foreground">Hapus item lama</label>
+                </div>
+                <Button type="button" onClick={() => void handleSavePreview()} disabled={!canSavePreview}>
                   {savingPreview ? 'Menyimpan...' : `Simpan ${saveTargetRows.length} Baris`}
                 </Button>
               </>

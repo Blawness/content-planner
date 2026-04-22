@@ -276,8 +276,16 @@ export async function generateScheduleRows(input: ScheduleGeneratorInput, deps: 
     input.monthLabel
   );
 
-  const ideaRaw = await callAiWithAudit(ideasPrompt, deps);
-  const parsedIdeas = extractIdeas(parseJson(ideaRaw)).map(normalizeIdea);
+  let parsedIdeas: IdeaSeed[] = [];
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const ideaRaw = await callAiWithAudit(ideasPrompt, deps);
+      parsedIdeas = extractIdeas(parseJson(ideaRaw)).map(normalizeIdea);
+      break;
+    } catch {
+      if (attempt === 2) parsedIdeas = [];
+    }
+  }
 
   const ideaSeeds: IdeaSeed[] = [];
 
