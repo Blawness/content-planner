@@ -4,11 +4,12 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/components/providers/AuthProvider'
-import { LayoutDashboard, Clock, Settings } from 'lucide-react'
+import { LayoutDashboard, Clock, Settings, SlidersHorizontal } from 'lucide-react'
 
 const coreNav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/schedule', label: 'Content Plan', icon: Clock },
+  { href: '/dashboard/settings', label: 'Pengaturan', icon: SlidersHorizontal },
 ]
 
 const adminNav = [

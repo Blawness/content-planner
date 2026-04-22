@@ -232,6 +232,37 @@ Rules:
 - Ensure this item stays unique compared with forbidden list.
 - No markdown, no explanation.`;
 
+export const recommendCampaignPrompt = (
+  brandName: string,
+  industry: string,
+  niche: string,
+  targetAudience: string,
+  brandVoice: string,
+  postingGoal: string,
+  currentDate: string
+) => `You are an expert Content Strategist. Based on the business context below, recommend the optimal content campaign for right now.
+
+Business Context:
+- Brand: ${brandName || '(not set)'}
+- Industry: ${industry || '(not set)'}
+- Niche: ${niche}
+- Target Audience: ${targetAudience || 'General audience'}
+- Brand Voice: ${brandVoice}
+- Main Posting Goal: ${postingGoal}
+- Current date: ${currentDate}
+
+Choose the most suitable campaign type and provide specific configuration.
+
+Return ONLY valid JSON:
+{
+  "preset": "awareness" | "engagement" | "launch",
+  "campaign_idea": "specific campaign angle and content direction, 2-3 sentences, in Bahasa Indonesia",
+  "tone": "Edukatif" | "Promosi" | "Entertaining" | "Inspiratif" | "Story Telling",
+  "content_per_week": number between 2 and 7,
+  "duration_weeks": number between 2 and 6,
+  "reasoning": "1-2 sentences in Bahasa Indonesia explaining why this campaign fits the business context and current timing"
+}`;
+
 export const predictTaskPrompt = (taskTitle: string) => `You are an expert Project Manager.
 Based on the following task title/description, predict the estimated time to complete it if done by a professional.
 Task: "${taskTitle}"

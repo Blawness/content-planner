@@ -28,6 +28,24 @@ model User {
 
   timeEntries      TimeEntry[]
   contentPlanItems ContentPlanItem[]
+  setting          UserSetting?
+}
+
+model UserSetting {
+  id                String   @id @default(cuid())
+  userId            String   @unique @map("user_id")
+  brandName         String   @default("") @map("brand_name")
+  industry          String   @default("")
+  niche             String   @default("")
+  targetAudience    String   @default("") @map("target_audience") @db.Text
+  preferredPlatform String   @default("Instagram") @map("preferred_platform")
+  brandVoice        String   @default("Edukatif") @map("brand_voice")
+  postingGoal       String   @default("awareness") @map("posting_goal")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
 }
 
 model TimeEntry {

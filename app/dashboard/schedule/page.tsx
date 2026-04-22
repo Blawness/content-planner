@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import DatePicker from 'react-datepicker'
 import { format, isValid, parse } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
-import { CalendarClock, CheckCheck, ChevronDown, Keyboard, PencilLine, Plus, Sparkles, Trash2, WandSparkles } from 'lucide-react'
+import { Brain, CalendarClock, CheckCheck, ChevronDown, Keyboard, PencilLine, Plus, Sparkles, Trash2, WandSparkles } from 'lucide-react'
+import Link from 'next/link'
 
 import type { ContentPlanRow } from '@/types'
 import { useAuth } from '@/components/providers/AuthProvider'
@@ -27,6 +28,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { fetchContentPlan, createContentPlanItem, updateContentPlanItem, deleteContentPlanItem, deleteAllContentPlan, batchCreateContentPlan } from '@/lib/api/content-plan'
+import { fetchUserSettings, type UserSettingData } from '@/lib/api/user-settings'
 import { useGenerateScheduleStream } from '@/hooks/useGenerateScheduleStream'
 import { cn } from '@/lib/utils'
 import 'react-datepicker/dist/react-datepicker.css'
@@ -197,6 +199,11 @@ export default function SchedulePage() {
   const [bulkFormat, setBulkFormat] = useState(FORMAT_OPTIONS[0])
   const [bulkTime, setBulkTime] = useState('10:00 WIB')
   const isUnauthorized = !authLoading && !token
+
+  const [businessContext, setBusinessContext] = useState<UserSettingData | null>(null)
+  const [isRecommending, setIsRecommending] = useState(false)
+  const [aiRecommendNote, setAiRecommendNote] = useState('')
+  const appliedContextRef = useRef(false)
 
   const pendingItemsRef = useRef<ContentPlanRow[]>([])
 
@@ -372,6 +379,25 @@ export default function SchedulePage() {
   }, [token])
 
   useEffect(() => {
+    if (!token) return
+    fetchUserSettings(token)
+      .then(setBusinessContext)
+      .catch(() => {})
+  }, [token])
+
+  useEffect(() => {
+    if (!showAiModal) {
+      appliedContextRef.current = false
+      return
+    }
+    if (appliedContextRef.current || !businessContext) return
+    appliedContextRef.current = true
+    if (businessContext.niche) setNiche(businessContext.niche)
+    if (businessContext.preferredPlatform) setPlatform(businessContext.preferredPlatform)
+    if (businessContext.targetAudience) setAiTargetAudience(businessContext.targetAudience)
+  }, [showAiModal, businessContext])
+
+  useEffect(() => {
     const compose = searchParams.get('compose')
     if (compose === 'manual') {
       openCreateModalForWeek()
@@ -514,6 +540,35 @@ export default function SchedulePage() {
       setPageError(err instanceof Error ? err.message : 'Gagal mengubah status item')
     }
   }
+
+  const handleAiRecommend = useCallback(async () => {
+    if (!token) return
+    setIsRecommending(true)
+    setAiError('')
+    setAiRecommendNote('')
+    try {
+      const res = await fetch('/api/ai/recommend-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Gagal mendapatkan rekomendasi' }))
+        throw new Error(err.message || 'Gagal mendapatkan rekomendasi')
+      }
+      const rec = await res.json()
+      setWizardDefaultsFromPreset(rec.preset ?? 'awareness')
+      if (rec.campaign_idea) setContentIdea(rec.campaign_idea)
+      if (rec.tone) setTone(rec.tone)
+      if (rec.content_per_week) setContentPerWeek(rec.content_per_week)
+      if (rec.duration_weeks) setDurationWeeks(rec.duration_weeks)
+      if (rec.reasoning) setAiRecommendNote(rec.reasoning)
+      setWizardStep(1)
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Gagal mendapatkan rekomendasi AI')
+    } finally {
+      setIsRecommending(false)
+    }
+  }, [token, setWizardDefaultsFromPreset])
 
   const handlePreviewGenerate = useCallback(async () => {
     if (!token) return
@@ -1076,6 +1131,41 @@ export default function SchedulePage() {
 
             {wizardStep === 0 ? (
               <div className="space-y-5">
+                {businessContext?.niche ? (
+                  <Card>
+                    <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Profil Bisnis Tersimpan</p>
+                        <p className="mt-1 font-medium">{businessContext.brandName || businessContext.niche}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          {businessContext.niche} · {businessContext.preferredPlatform} · {businessContext.brandVoice}
+                        </p>
+                      </div>
+                      <Link
+                        href="/dashboard/settings"
+                        className="shrink-0 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                        onClick={() => setShowAiModal(false)}
+                      >
+                        Edit profil
+                      </Link>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Alert>
+                    <AlertTitle>Profil bisnis belum diatur</AlertTitle>
+                    <AlertDescription>
+                      <Link
+                        href="/dashboard/settings"
+                        className="font-medium underline underline-offset-4"
+                        onClick={() => setShowAiModal(false)}
+                      >
+                        Isi profil bisnis di Pengaturan
+                      </Link>{' '}
+                      agar wizard bisa auto-fill dan AI bisa merekomendasikan campaign terbaik untuk bisnis Anda.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {step0BlockingIssues.length > 0 ? (
                   <Alert variant="destructive">
                     <AlertTitle>Lengkapi step ini dulu</AlertTitle>
@@ -1167,6 +1257,14 @@ export default function SchedulePage() {
 
             {wizardStep === 1 ? (
               <div className="space-y-5">
+                {aiRecommendNote ? (
+                  <Alert>
+                    <Brain className="size-4" />
+                    <AlertTitle>AI merekomendasikan konfigurasi ini</AlertTitle>
+                    <AlertDescription>{aiRecommendNote}</AlertDescription>
+                  </Alert>
+                ) : null}
+
                 {step1BlockingIssues.length > 0 ? (
                   <Alert variant="destructive">
                     <AlertTitle>Konfigurasi belum siap</AlertTitle>
@@ -1485,8 +1583,19 @@ export default function SchedulePage() {
             {wizardStep === 0 ? (
               <>
                 <Button type="button" variant="outline" onClick={closeAiWizard}>Batal</Button>
+                {businessContext?.niche ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleAiRecommend()}
+                    disabled={isRecommending || !canAdvanceToConfiguration}
+                  >
+                    <Brain className="size-4" />
+                    {isRecommending ? 'AI sedang memilih...' : 'AI Pilihkan Campaign'}
+                  </Button>
+                ) : null}
                 <Button type="button" onClick={() => setWizardStep(1)} disabled={!canAdvanceToConfiguration}>
-                  Lanjut ke Konfigurasi
+                  Atur Sendiri
                 </Button>
               </>
             ) : null}
