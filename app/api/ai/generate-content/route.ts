@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import { generateContentPrompt } from '@/lib/prompts';
 import { openRouterChat } from '@/lib/openrouter';
 import { getActiveAiModel } from '@/lib/ai-settings';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
     const { sub: userId } = await requireAuth(request);
+
+    const rl = checkRateLimit(`generate-content:${userId}`, 10, 60_000)
+    if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds)
+
     const body = await request.json();
 
     const { niche, platform, goal, target_audience: targetAudience, count = 3 } = body;
@@ -19,23 +23,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const maxCount = Math.min(Math.max(count, 1), 10);
-    const prompt = generateContentPrompt(niche, platform, goal, targetAudience, maxCount);
+    const maxCount = Math.min(Math.max(Number(count) || 3, 1), 10);
+    const prompt = generateContentPrompt(
+      String(niche).slice(0, 200),
+      String(platform).slice(0, 100),
+      String(goal).slice(0, 200),
+      String(targetAudience).slice(0, 300),
+      maxCount
+    );
 
     const model = await getActiveAiModel();
-    const aiContent = await openRouterChat([
-      { role: 'user', content: prompt }
-    ], model);
+    const aiContent = await openRouterChat([{ role: 'user', content: prompt }], model);
 
     let jsonResponse;
     try {
       jsonResponse = JSON.parse(aiContent);
-      // It might return an object like { "ideas": [...] } instead of array directly
       if (!Array.isArray(jsonResponse) && jsonResponse.ideas) {
         jsonResponse = jsonResponse.ideas;
       }
     } catch {
-      console.error("Failed to parse AI JSON:", aiContent);
+      console.error('Failed to parse AI JSON:', aiContent);
       return NextResponse.json(
         { message: 'AI returned invalid JSON format', raw: aiContent },
         { status: 500 }
@@ -44,8 +51,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ideas: jsonResponse });
   } catch (e) {
-    console.error("Error in generate-content:", e);
-    if (e instanceof Response) return e; // Auth error
+    console.error('Error in generate-content:', e);
+    if (e instanceof Response) return e;
     return NextResponse.json(
       { message: e instanceof Error ? e.message : 'Internal Server Error' },
       { status: 500 }

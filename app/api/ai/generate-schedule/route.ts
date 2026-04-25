@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
 
 import { requireAuth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { openRouterChat } from '@/lib/openrouter';
 import { getActiveAiModel } from '@/lib/ai-settings';
 import { generateScheduleRows } from '@/lib/ai/schedule-generator';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
     const { sub: userId } = await requireAuth(request);
+
+    const rl = checkRateLimit(`generate-schedule:${userId}`, 5, 60_000)
+    if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds)
     const body = await request.json();
 
     const {

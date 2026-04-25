@@ -4,12 +4,17 @@ import { prisma } from '@/lib/prisma'
 import { openRouterChat } from '@/lib/openrouter'
 import { getActiveAiModel } from '@/lib/ai-settings'
 import { recommendCampaignPrompt } from '@/lib/prompts'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { format } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 
 export async function POST(request: Request) {
   try {
     const { sub: userId } = await requireAuth(request)
+
+    const rl = checkRateLimit(`recommend-campaign:${userId}`, 10, 60_000)
+    if (!rl.allowed) return rateLimitResponse(rl.retryAfterSeconds)
+
     const model = await getActiveAiModel()
 
     const setting = await prisma.userSetting.findUnique({ where: { userId } })

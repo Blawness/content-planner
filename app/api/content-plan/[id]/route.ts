@@ -1,25 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
-import type { ContentPlanItem } from '@prisma/client'
-
-function rowToResponse(item: ContentPlanItem) {
-  return {
-    id: item.id,
-    week_label: item.weekLabel,
-    date: item.date,
-    day: item.day,
-    topic: item.topic,
-    format: item.format,
-    headline: item.headline,
-    visual_description: item.visualDescription ?? '',
-    content_body: item.contentBody ?? '',
-    hook_caption: item.hookCaption ?? '',
-    scheduled_time: item.scheduledTime,
-    status: item.status,
-    notes: item.notes,
-  }
-}
+import { rowToResponse } from '@/lib/api/content-plan-helpers'
 
 // PUT — update single item
 export async function PUT(
