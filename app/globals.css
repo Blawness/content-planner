@@ -85,28 +85,3 @@
   }
 }
 
-/* react-datepicker dark mode overrides */
-.dark .react-datepicker {
-  background-color: hsl(var(--card));
-  border-color: hsl(var(--border));
-  color: hsl(var(--foreground));
-}
-
-.dark .react-datepicker__day--selected {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-
-.dark .react-datepicker__header {
-  background-color: hsl(var(--card));
-  border-color: hsl(var(--border));
-}
-
-.dark .react-datepicker__day-name {
-  color: hsl(var(--foreground));
-}
-
-.dark .react-datepicker__day--today {
-  background-color: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
-}

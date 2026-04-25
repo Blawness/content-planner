@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import DatePicker from 'react-datepicker'
 import { addDays, endOfWeek, format, isValid, parse, startOfWeek } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { Brain, CalendarClock, CheckCheck, ChevronDown, ClipboardCheck, Copy, PencilLine, Plus, Sparkles, Trash2, WandSparkles } from 'lucide-react'
@@ -27,11 +26,12 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { DatePicker } from '@/components/ui/DatePicker'
+import { DateRangePicker } from '@/components/ui/DateRangePicker'
 import { fetchContentPlan, createContentPlanItem, updateContentPlanItem, deleteContentPlanItem, deleteAllContentPlan, batchCreateContentPlan } from '@/lib/api/content-plan'
 import { fetchUserSettings, type UserSettingData } from '@/lib/api/user-settings'
 import { useGenerateScheduleStream } from '@/hooks/useGenerateScheduleStream'
 import { cn } from '@/lib/utils'
-import 'react-datepicker/dist/react-datepicker.css'
 
 const PLATFORMS = ['Instagram', 'TikTok', 'LinkedIn']
 const TONES = ['Edukatif', 'Promosi', 'Entertaining', 'Inspiratif', 'Story Telling']
@@ -985,15 +985,10 @@ export default function SchedulePage() {
             </DialogHeader>
           </div>
           <div className="px-5 py-4">
-            <DatePicker
-              selectsRange
-              startDate={weekRange[0]}
-              endDate={weekRange[1]}
-              onChange={(range) => setWeekRange(range as [Date | null, Date | null])}
-              monthsShown={2}
-              inline
-              locale={localeId}
-              dateFormat="dd/MM/yyyy"
+            <DateRangePicker
+              dateRange={{ from: weekRange[0] || undefined, to: weekRange[1] || undefined }}
+              onDateRangeChange={(range) => setWeekRange([range?.from || null, range?.to || null])}
+              placeholder="Pilih rentang tanggal minggu"
             />
           </div>
           <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
@@ -1046,9 +1041,8 @@ export default function SchedulePage() {
 
                 <FormField label="Tanggal" htmlFor="date" required>
                   <DatePicker
-                    id="date"
-                    selected={parseUiDate(formRow.date)}
-                    onChange={(date: Date | null) => {
+                    date={parseUiDate(formRow.date) || undefined}
+                    onDateChange={(date) => {
                       if (!date) {
                         handleFormRowChange('date', '')
                         handleFormRowChange('day', '')
@@ -1058,12 +1052,8 @@ export default function SchedulePage() {
                       handleFormRowChange('day', getUiDay(date))
                       handleFormRowChange('week_label', detectWeekLabel(date, rows))
                     }}
-                    dateFormat="dd/MM/yyyy"
-                    placeholderText="dd/mm/yyyy"
-                    className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    calendarClassName="text-sm"
-                    popperClassName="z-[70]"
-                    popperPlacement="bottom-start"
+                    placeholder="dd/mm/yyyy"
+                    className="h-10"
                   />
                 </FormField>
 
@@ -1338,15 +1328,10 @@ export default function SchedulePage() {
                   <FormGrid className="md:grid-cols-3">
                     <FormField label="Tanggal mulai" htmlFor="aiStartDate">
                       <DatePicker
-                        id="aiStartDate"
-                        selected={startDate}
-                        onChange={(date: Date | null) => setStartDate(date)}
-                        dateFormat="dd/MM/yyyy"
-                        placeholderText="Pilih tanggal mulai"
-                        className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                        calendarClassName="text-sm"
-                        popperClassName="z-[70]"
-                        popperPlacement="bottom-start"
+                        date={startDate || undefined}
+                        onDateChange={(date) => setStartDate(date || null)}
+                        placeholder="Pilih tanggal mulai"
+                        className="h-10"
                       />
                     </FormField>
 
