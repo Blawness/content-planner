@@ -105,12 +105,17 @@ export function useAiWizard(
     appliedContextRef.current = false
   }, [setPresetDefaults, resetPreviewState])
 
+  // Draft exists if user has typed any identifying content
+  const hasDraft = niche !== '' || targetAudience !== ''
+
   const openWizard = useCallback((options?: { preserveDraft?: boolean; prefill?: { niche?: string; platform?: string; goal?: string; targetAudience?: string } }) => {
-    if (!options?.preserveDraft) {
-      reset()
-    } else {
+    const currentHasDraft = niche !== '' || targetAudience !== ''
+    if (options?.preserveDraft || currentHasDraft) {
+      // Preserve form fields, only reset preview/stream state
       setWizardStep(0)
       resetPreviewState()
+    } else {
+      reset()
     }
     if (options?.prefill) {
       if (options.prefill.niche) setNiche(options.prefill.niche)
@@ -126,12 +131,19 @@ export function useAiWizard(
       if (businessContext.targetAudience) setTargetAudience(businessContext.targetAudience)
     }
     setOpen(true)
-  }, [reset, resetPreviewState, businessContext])
+  }, [niche, targetAudience, reset, resetPreviewState, businessContext])
 
+  // Close and save draft — called on backdrop click / Escape key
+  const closeWithDraft = useCallback(() => {
+    setOpen(false)
+    // Intentionally no reset — form fields preserved in hook memory as draft
+  }, [])
+
+  // Full cancel — discards all draft data
   const closeWizard = useCallback(() => {
     setOpen(false)
-    resetPreviewState()
-  }, [resetPreviewState])
+    reset()
+  }, [reset])
 
   const recommend = useCallback(async () => {
     if (!token) return
@@ -260,7 +272,7 @@ export function useAiWizard(
 
   return {
     // open state
-    open, openWizard, closeWizard,
+    open, openWizard, closeWizard, closeWithDraft, hasDraft,
     // wizard navigation
     wizardStep, setWizardStep,
     autoGenerateRef,

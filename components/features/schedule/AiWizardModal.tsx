@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
-import { Brain, CheckCheck, ClipboardCheck, Copy, Trash2 } from 'lucide-react'
+import { Brain, CheckCheck, ClipboardCheck, Copy, Save, Trash2, X } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -37,7 +37,7 @@ interface Props {
 
 export function AiWizardModal({ wizard, hasBusinessContext, blockingIssues, hints }: Props) {
   const {
-    open, closeWizard, wizardStep, setWizardStep,
+    open, closeWizard, closeWithDraft, hasDraft, wizardStep, setWizardStep,
     selectedPresetId, selectedPreset, setPresetDefaults,
     contentPerWeek, setContentPerWeek, normalizedContentPerWeek,
     platform, setPlatform,
@@ -107,13 +107,30 @@ export function AiWizardModal({ wizard, hasBusinessContext, blockingIssues, hint
   }, [open, wizardStep, canGeneratePreview, canSavePreview, previewLoading, savingPreview, previewRows.length, generatePreview, savePreview, setWizardStep, selectAll, clearSelection])
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) closeWizard() }}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) closeWithDraft() }}>
       <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto p-0 sm:max-w-5xl" showCloseButton={false}>
         <div className="border-b border-border px-5 py-4">
-          <DialogHeader>
-            <DialogTitle>AI Content Plan Wizard</DialogTitle>
-            <DialogDescription>Pilih preset, atur parameter, review preview hasil AI, lalu simpan ke content plan ketika sudah yakin.</DialogDescription>
-          </DialogHeader>
+          <div className="flex items-start justify-between gap-4">
+            <DialogHeader>
+              <DialogTitle>AI Content Plan Wizard</DialogTitle>
+              <DialogDescription>Pilih preset, atur parameter, review preview hasil AI, lalu simpan ke content plan ketika sudah yakin.</DialogDescription>
+            </DialogHeader>
+            <div className="flex shrink-0 items-center gap-2 pt-0.5">
+              {hasDraft ? (
+                <span className="flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">
+                  <Save className="size-3" />Draft tersimpan
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={closeWithDraft}
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Tutup (simpan draft)"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-5 px-5 py-5">
@@ -455,7 +472,7 @@ export function AiWizardModal({ wizard, hasBusinessContext, blockingIssues, hint
         <DialogFooter>
           {wizardStep === 0 ? (
             <>
-              <Button type="button" variant="outline" onClick={closeWizard}>Batal</Button>
+              <Button type="button" variant="outline" onClick={closeWizard}>Buang Draft</Button>
               {hasBusinessContext ? (
                 <Button type="button" variant="outline" onClick={() => void recommend()} disabled={isRecommending}>
                   <Brain className="size-4" />
