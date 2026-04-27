@@ -99,6 +99,43 @@ export function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+const CSV_HEADERS = [
+  'Minggu', 'Tanggal', 'Hari', 'Topik', 'Format', 'Headline',
+  'Deskripsi Visual', 'Isi Konten', 'Hook / Caption',
+  'Waktu Publish', 'Status', 'Catatan',
+]
+
+function csvCell(value: string | undefined | null): string {
+  const str = value ?? ''
+  if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+export function exportToCsv(rows: ContentPlanRow[], filename = 'content-plan.csv'): void {
+  const lines = [
+    CSV_HEADERS.join(','),
+    ...rows.map((r) =>
+      [
+        r.week_label, r.date, r.day, r.topic, r.format, r.headline,
+        r.visual_description, r.content_body, r.hook_caption,
+        r.scheduled_time, r.status, r.notes,
+      ]
+        .map(csvCell)
+        .join(',')
+    ),
+  ]
+  const bom = '﻿'
+  const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function buildCopyText(row: ContentPlanRow): string {
   const sep = '─'.repeat(40)
   return [

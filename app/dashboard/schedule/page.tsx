@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { startOfWeek } from 'date-fns'
-import { CalendarClock, PencilLine, WandSparkles } from 'lucide-react'
+import { CalendarClock, Download, PencilLine, WandSparkles } from 'lucide-react'
 
 import type { ContentPlanRow } from '@/types'
 import { useAuth } from '@/components/providers/AuthProvider'
@@ -18,7 +18,7 @@ import { CrudModal } from '@/components/features/schedule/CrudModal'
 import { WeekLabelPickerDialog } from '@/components/features/schedule/WeekLabelPickerDialog'
 import { useAiWizard } from '@/components/features/schedule/hooks/useAiWizard'
 import { EMPTY_ROW } from '@/components/features/schedule/constants'
-import { buildWeekLabel, parseWeekLabel, sortRows } from '@/components/features/schedule/utils'
+import { buildWeekLabel, exportToCsv, parseWeekLabel, sortRows } from '@/components/features/schedule/utils'
 
 export default function SchedulePage() {
   const router = useRouter()
@@ -240,6 +240,11 @@ export default function SchedulePage() {
         description="Satu source of truth untuk ide, AI generate, jadwal publish, dan detail setiap konten. Preview AI tidak akan tersimpan sebelum Anda konfirmasi."
         actions={
           <>
+            {rows.length > 0 ? (
+              <Button type="button" variant="outline" onClick={() => exportToCsv(rows)}>
+                <Download className="size-4" />Export CSV
+              </Button>
+            ) : null}
             <Button type="button" variant="outline" onClick={() => openCreateModalForWeek()}>
               <PencilLine className="size-4" />Tambah Manual
             </Button>
