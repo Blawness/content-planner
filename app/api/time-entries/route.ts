@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const date = searchParams.get('date')
 
     // Get time entries for user, optionally filtered by date
-    const where: any = { userId }
+    const where: { userId: string; date?: string } = { userId }
     if (date) {
       where.date = date
     }
