@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes ai-shimmer {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(300%); }
+}
+@keyframes ai-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+@keyframes ai-log-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@layer utilities {
+  .ai-shimmer {
+    position: absolute;
+    inset: 0;
+    width: 50%;
+    background: linear-gradient(90deg, transparent 0%, oklch(1 0 0 / 0.28) 50%, transparent 100%);
+    animation: ai-shimmer 1.4s linear infinite;
+  }
+  .ai-cursor {
+    animation: ai-cursor-blink 1s step-start infinite;
+  }
+  .ai-log-in {
+    animation: ai-log-in 0.2s ease-out both;
+  }
+}
+
 @layer base {
   .theme {
     --font-heading: var(--font-sans);

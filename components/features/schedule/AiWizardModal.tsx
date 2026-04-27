@@ -17,6 +17,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { AI_PRESETS, PLATFORMS, TONES, FORMAT_OPTIONS, STATUS_OPTIONS, WIZARD_STEPS } from './constants'
+import { StreamingLoader } from './StreamingLoader'
 import { buildCopyText } from './utils'
 import type { AiWizardState } from './hooks/useAiWizard'
 
@@ -318,23 +319,12 @@ export function AiWizardModal({ wizard, hasBusinessContext, blockingIssues, hint
               </Card>
 
               {previewLoading ? (
-                <Card>
-                  <CardContent className="space-y-4 py-6">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-medium">AI sedang menyiapkan preview</p>
-                        <p className="text-sm text-muted-foreground">{streamMessage || 'Mohon tunggu, hasil akan muncul bertahap.'}</p>
-                      </div>
-                      <Badge variant="secondary">{streamProgress.current}/{streamProgress.total || estimatedCount}</Badge>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full bg-foreground transition-all duration-300"
-                        style={{ width: `${streamProgress.total ? (streamProgress.current / streamProgress.total) * 100 : 8}%` }}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
+                <StreamingLoader
+                  message={streamMessage}
+                  current={streamProgress.current}
+                  total={streamProgress.total}
+                  estimatedCount={estimatedCount}
+                />
               ) : null}
 
               {!previewLoading && previewRows.length === 0 ? (
