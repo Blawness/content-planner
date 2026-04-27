@@ -15,10 +15,11 @@ import { fetchUserSettings, type UserSettingData } from '@/lib/api/user-settings
 import { AiWizardModal } from '@/components/features/schedule/AiWizardModal'
 import { ContentPlanTable } from '@/components/features/schedule/ContentPlanTable'
 import { CrudModal } from '@/components/features/schedule/CrudModal'
+import { FilterBar } from '@/components/features/schedule/FilterBar'
 import { WeekLabelPickerDialog } from '@/components/features/schedule/WeekLabelPickerDialog'
 import { useAiWizard } from '@/components/features/schedule/hooks/useAiWizard'
 import { EMPTY_ROW } from '@/components/features/schedule/constants'
-import { buildWeekLabel, exportToCsv, parseWeekLabel, sortRows } from '@/components/features/schedule/utils'
+import { buildWeekLabel, exportToCsv, filterRows, parseWeekLabel, sortRows } from '@/components/features/schedule/utils'
 
 export default function SchedulePage() {
   const router = useRouter()
@@ -28,6 +29,10 @@ export default function SchedulePage() {
   const [rows, setRows] = useState<ContentPlanRow[]>([])
   const [loadingItems, setLoadingItems] = useState(true)
   const [pageError, setPageError] = useState('')
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [formatFilter, setFormatFilter] = useState('')
 
   const [showCrudModal, setShowCrudModal] = useState(false)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
@@ -46,9 +51,16 @@ export default function SchedulePage() {
 
   const isUnauthorized = !authLoading && !token
 
+  const filteredRows = useMemo(
+    () => filterRows(rows, searchQuery, statusFilter, formatFilter),
+    [rows, searchQuery, statusFilter, formatFilter]
+  )
+
+  const isFiltering = searchQuery.trim() !== '' || statusFilter !== '' || formatFilter !== ''
+
   const weekKeys = useMemo(
-    () => Array.from(new Set(sortRows(rows).map((r) => r.week_label).filter(Boolean))),
-    [rows]
+    () => Array.from(new Set(sortRows(filteredRows).map((r) => r.week_label).filter(Boolean))),
+    [filteredRows]
   )
 
   const wizard = useAiWizard(businessContext, token, (saved, replace) => {
@@ -200,6 +212,12 @@ export default function SchedulePage() {
     }
   }
 
+  function handleResetFilters() {
+    setSearchQuery('')
+    setStatusFilter('')
+    setFormatFilter('')
+  }
+
   function handleCopyRow(key: string) {
     setCopiedRowId(key)
     setTimeout(() => setCopiedRowId(null), 2000)
@@ -241,7 +259,7 @@ export default function SchedulePage() {
         actions={
           <>
             {rows.length > 0 ? (
-              <Button type="button" variant="outline" onClick={() => exportToCsv(rows)}>
+              <Button type="button" variant="outline" onClick={() => exportToCsv(filteredRows)}>
                 <Download className="size-4" />Export CSV
               </Button>
             ) : null}
@@ -274,19 +292,45 @@ export default function SchedulePage() {
       ) : null}
 
       {!authLoading && !isUnauthorized && !loadingItems && !pageError && rows.length > 0 ? (
-        <ContentPlanTable
-          rows={rows}
-          weekKeys={weekKeys}
-          expandedIndex={expandedIndex}
-          copiedRowId={copiedRowId}
-          onExpandToggle={setExpandedIndex}
-          onWeekLabelClick={openWeekLabelPicker}
-          onAddToWeek={openCreateModalForWeek}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onStatusChange={handleQuickStatusChange}
-          onCopy={handleCopyRow}
-        />
+        <>
+          <FilterBar
+            searchQuery={searchQuery}
+            statusFilter={statusFilter}
+            formatFilter={formatFilter}
+            totalCount={rows.length}
+            filteredCount={filteredRows.length}
+            isFiltering={isFiltering}
+            onSearchChange={setSearchQuery}
+            onStatusChange={setStatusFilter}
+            onFormatChange={setFormatFilter}
+            onReset={handleResetFilters}
+          />
+          <ContentPlanTable
+            rows={filteredRows}
+            weekKeys={weekKeys}
+            expandedIndex={expandedIndex}
+            copiedRowId={copiedRowId}
+            onExpandToggle={setExpandedIndex}
+            onWeekLabelClick={openWeekLabelPicker}
+            onAddToWeek={openCreateModalForWeek}
+            onEdit={(idx) => {
+              const target = filteredRows[idx]
+              const realIdx = rows.findIndex((r) => r.id === target.id)
+              handleEdit(realIdx)
+            }}
+            onDelete={(idx) => {
+              const target = filteredRows[idx]
+              const realIdx = rows.findIndex((r) => r.id === target.id)
+              void handleDelete(realIdx)
+            }}
+            onStatusChange={(idx, status) => {
+              const target = filteredRows[idx]
+              const realIdx = rows.findIndex((r) => r.id === target.id)
+              void handleQuickStatusChange(realIdx, status)
+            }}
+            onCopy={handleCopyRow}
+          />
+        </>
       ) : null}
 
       <WeekLabelPickerDialog

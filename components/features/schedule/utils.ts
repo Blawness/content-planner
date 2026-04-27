@@ -148,3 +148,24 @@ export function buildCopyText(row: ContentPlanRow): string {
     'DESKRIPSI VISUAL', row.visual_description || '-',
   ].join('\n')
 }
+
+export function filterRows(
+  rows: ContentPlanRow[],
+  query: string,
+  status: string,
+  format: string
+): ContentPlanRow[] {
+  const q = query.trim().toLowerCase()
+  return rows.filter((row) => {
+    if (q) {
+      const matched =
+        row.topic.toLowerCase().includes(q) ||
+        row.headline.toLowerCase().includes(q) ||
+        row.hook_caption.toLowerCase().includes(q)
+      if (!matched) return false
+    }
+    if (status && row.status !== status) return false
+    if (format && row.format !== format) return false
+    return true
+  })
+}
