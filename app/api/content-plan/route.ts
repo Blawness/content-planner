@@ -3,12 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
 import { rowToResponse } from '@/lib/api/content-plan-helpers'
 
-// GET — fetch content plan items for the authenticated user
+// GET — fetch all content plan items from all users
 export async function GET(request: NextRequest) {
   try {
-    const { sub: userId } = await requireAuth(request)
+    await requireAuth(request)
     const items = await prisma.contentPlanItem.findMany({
-      where: { userId },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     })
     return NextResponse.json(items.map(rowToResponse))
